@@ -1,0 +1,60 @@
+name: Render diagrams
+
+# The architecture diagram is authored as draw.io XML and edited online via
+# app.diagrams.net, which commits the .drawio straight back to main. This
+# workflow re-exports the SVG the README embeds, so the picture can never
+# drift from the source: edit the diagram, and the render follows.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/diagrams/**/*.drawio"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: render-diagrams
+  cancel-in-progress: true
+
+jobs:
+  render:
+    name: Export draw.io to SVG
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Export SVG
+        uses: rlespinasse/drawio-export-action@v2
+        with:
+          path: docs/diagrams
+          format: svg
+          output: export
+          remove-page-suffix: true
+          # Export everything rather than diffing git history for changed
+          # files — "auto" needs a full clone, and the commit step below
+          # already no-ops when the rendered output is unchanged.
+          action-mode: all
+
+      - name: Move rendered files next to their sources
+        # The export action runs in a container as root, so its output
+        # directory comes out root-owned and the runner user cannot move
+        # files out of it without sudo.
+        run: |
+          sudo mv docs/diagrams/export/*.svg docs/diagrams/
+          sudo rm -rf docs/diagrams/export
+          sudo chown "$(id -u):$(id -g)" docs/diagrams/*.svg
+
+      - name: Commit and push if changed
+        run: |
+          git add docs/diagrams/*.svg
+          if git diff --cached --quiet; then
+            echo "Rendered SVG is already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "docs(diagrams): render diagrams to svg [skip ci]"
+          git push
