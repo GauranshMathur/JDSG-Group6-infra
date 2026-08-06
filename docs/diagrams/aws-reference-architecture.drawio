@@ -55,11 +55,20 @@
         <mxCell id="ec2iconA" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#ED7100;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=9;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ec2;" value="" vertex="1">
           <mxGeometry height="32" width="32" x="876" y="698" as="geometry" />
         </mxCell>
-        <mxCell id="ingctrlA" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F5FF;strokeColor=#326CE5;fontSize=10;" value="Ingress controller pod&#xa;(Traefik)" vertex="1">
-          <mxGeometry height="50" width="190" x="465" y="740" as="geometry" />
+        <mxCell id="k8sIngA" parent="1" style="sketch=0;html=1;dashed=0;whiteSpace=wrap;fillColor=#2875E2;strokeColor=#ffffff;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#232F3E;aspect=fixed;shape=mxgraph.kubernetes.icon;prIcon=ing;" value="Ingress" vertex="1">
+          <mxGeometry height="42" width="42" x="444" y="738" as="geometry" />
         </mxCell>
-        <mxCell id="podsA" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F5FF;strokeColor=#326CE5;fontSize=10;" value="web pods (Rails)&#xa;replicas ≥ 2, readiness /up" vertex="1">
-          <mxGeometry height="50" width="220" x="690" y="740" as="geometry" />
+        <mxCell id="k8sDeployA" parent="1" style="sketch=0;html=1;dashed=0;whiteSpace=wrap;fillColor=#2875E2;strokeColor=#ffffff;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#232F3E;aspect=fixed;shape=mxgraph.kubernetes.icon;prIcon=deploy;" value="Deployment" vertex="1">
+          <mxGeometry height="42" width="42" x="549" y="738" as="geometry" />
+        </mxCell>
+        <mxCell id="k8sPodA" parent="1" style="sketch=0;html=1;dashed=0;whiteSpace=wrap;fillColor=#2875E2;strokeColor=#ffffff;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#232F3E;aspect=fixed;shape=mxgraph.kubernetes.icon;prIcon=pod;" value="Pod" vertex="1">
+          <mxGeometry height="42" width="42" x="654" y="738" as="geometry" />
+        </mxCell>
+        <mxCell id="k8sSvcA" parent="1" style="sketch=0;html=1;dashed=0;whiteSpace=wrap;fillColor=#2875E2;strokeColor=#ffffff;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#232F3E;aspect=fixed;shape=mxgraph.kubernetes.icon;prIcon=svc;" value="Svc" vertex="1">
+          <mxGeometry height="42" width="42" x="759" y="738" as="geometry" />
+        </mxCell>
+        <mxCell id="k8sPvcA" parent="1" style="sketch=0;html=1;dashed=0;whiteSpace=wrap;fillColor=#2875E2;strokeColor=#ffffff;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#232F3E;aspect=fixed;shape=mxgraph.kubernetes.icon;prIcon=pvc;" value="PVC" vertex="1">
+          <mxGeometry height="42" width="42" x="864" y="738" as="geometry" />
         </mxCell>
         <mxCell id="ec2boxB" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#ED7100;verticalAlign=top;align=left;spacingLeft=8;spacingTop=2;fontSize=10;fontColor=#232F3E;" value="EC2 node(s)" vertex="1">
           <mxGeometry height="125" width="515" x="1065" y="690" as="geometry" />
@@ -67,11 +76,20 @@
         <mxCell id="ec2iconB" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#ED7100;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=9;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ec2;" value="" vertex="1">
           <mxGeometry height="32" width="32" x="1537" y="698" as="geometry" />
         </mxCell>
-        <mxCell id="podsB" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F5FF;strokeColor=#326CE5;fontSize=10;" value="web pods (Rails)&#xa;replicas ≥ 2, readiness /up" vertex="1">
-          <mxGeometry height="50" width="220" x="1090" y="740" as="geometry" />
+        <mxCell id="k8sIngB" parent="1" style="sketch=0;html=1;dashed=0;whiteSpace=wrap;fillColor=#2875E2;strokeColor=#ffffff;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#232F3E;aspect=fixed;shape=mxgraph.kubernetes.icon;prIcon=ing;" value="Ingress" vertex="1">
+          <mxGeometry height="42" width="42" x="1104" y="738" as="geometry" />
         </mxCell>
-        <mxCell id="ingctrlB" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F5FF;strokeColor=#326CE5;fontSize=10;" value="Ingress controller pod&#xa;(Traefik)" vertex="1">
-          <mxGeometry height="50" width="190" x="1330" y="740" as="geometry" />
+        <mxCell id="k8sDeployB" parent="1" style="sketch=0;html=1;dashed=0;whiteSpace=wrap;fillColor=#2875E2;strokeColor=#ffffff;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#232F3E;aspect=fixed;shape=mxgraph.kubernetes.icon;prIcon=deploy;" value="Deployment" vertex="1">
+          <mxGeometry height="42" width="42" x="1209" y="738" as="geometry" />
+        </mxCell>
+        <mxCell id="k8sPodB" parent="1" style="sketch=0;html=1;dashed=0;whiteSpace=wrap;fillColor=#2875E2;strokeColor=#ffffff;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#232F3E;aspect=fixed;shape=mxgraph.kubernetes.icon;prIcon=pod;" value="Pod" vertex="1">
+          <mxGeometry height="42" width="42" x="1314" y="738" as="geometry" />
+        </mxCell>
+        <mxCell id="k8sSvcB" parent="1" style="sketch=0;html=1;dashed=0;whiteSpace=wrap;fillColor=#2875E2;strokeColor=#ffffff;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#232F3E;aspect=fixed;shape=mxgraph.kubernetes.icon;prIcon=svc;" value="Svc" vertex="1">
+          <mxGeometry height="42" width="42" x="1419" y="738" as="geometry" />
+        </mxCell>
+        <mxCell id="k8sPvcB" parent="1" style="sketch=0;html=1;dashed=0;whiteSpace=wrap;fillColor=#2875E2;strokeColor=#ffffff;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#232F3E;aspect=fixed;shape=mxgraph.kubernetes.icon;prIcon=pvc;" value="PVC" vertex="1">
+          <mxGeometry height="42" width="42" x="1524" y="738" as="geometry" />
         </mxCell>
         <mxCell id="clusternote" parent="1" style="text;html=1;align=right;verticalAlign=middle;fontSize=10;fontStyle=2;fontColor=#7F8C99;whiteSpace=wrap;" value="full in-cluster dataflow: separate diagram" vertex="1">
           <mxGeometry height="22" width="420" x="1180" y="872" as="geometry" />
@@ -157,19 +175,17 @@
         <mxCell id="e_cf_alb" edge="1" parent="1" source="cf" target="alb" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#232F3E;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_alb_podsA" edge="1" parent="1" source="alb" target="podsA" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#232F3E;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
+        <mxCell id="e_alb_nodeA" edge="1" parent="1" source="alb" target="ec2boxA" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#232F3E;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.375;entryDx=0;entryDy=0;">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="985" y="665" />
-              <mxPoint x="800" y="665" />
+              <mxPoint x="985" y="737" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_alb_podsB" edge="1" parent="1" source="alb" target="podsB" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#232F3E;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
+        <mxCell id="e_alb_nodeB" edge="1" parent="1" source="alb" target="ec2boxB" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#232F3E;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.375;entryDx=0;entryDy=0;">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="985" y="665" />
-              <mxPoint x="1200" y="665" />
+              <mxPoint x="985" y="737" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -196,13 +212,8 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_nlb_ing" edge="1" parent="1" source="nlb" target="ingctrlA" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#8C4FFF;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="868" y="610" />
-              <mxPoint x="560" y="610" />
-            </Array>
-          </mxGeometry>
+        <mxCell id="e_nlb_nodeA" edge="1" parent="1" source="nlb" target="ec2boxA" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#8C4FFF;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.899;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="e_cluster_nat1" edge="1" parent="1" source="cluster" target="nat1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#248814;dashed=1;exitX=0.1935;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;">
           <mxGeometry relative="1" as="geometry">

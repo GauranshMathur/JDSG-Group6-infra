@@ -103,18 +103,18 @@ balancers at the API level, so both appear in the Terraform, but neither forward
 ServiceLB does real L4.
 
 **Inside the cluster** (private subnets, two AZs, an EKS managed node group per zone):
-the diagram shows each zone's EC2 nodes running the basic Kubernetes workload — the
-ingress controller pods and the web pods (replicas ≥ 2, readiness probing `/up`) — and
-deliberately stops there. Arrows on the diagram mean traffic, so the objects that wire
-the cluster rather than carry requests stay in prose: the `Ingress` rule mapping the
-hostname to a `Service` (ClusterIP), the `Deployment` with its PodDisruptionBudget, the
-**HPA** scaling replicas, the **Cluster Autoscaler** scaling node groups, and a **PVC**
-on the EBS CSI driver (gp3) for stateful add-ons like Prometheus. All of them remain in
-the design and land with the manifests; they get drawn in a dedicated in-cluster dataflow
-diagram rather than crowding this one. Pods reach RDS on 5432, S3 for media, and SSM for
-secrets via IRSA; nodes pull images from ECR; egress from private subnets goes NAT
-gateway → **Network Firewall** (egress inspection) per AZ. Security groups scope every
-hop; nothing in a private subnet is internet-reachable.
+each zone's EC2 node box carries the basic Kubernetes objects that run the app —
+`Ingress`, `Deployment`, `Pod`, `Service`, `PVC` — drawn with the community icons as a
+deliberately unwired list: what lives on a node, not how it connects. Arrows on the
+diagram mean traffic, so both load balancer paths land on the node boxes, and the wiring
+between the objects waits for the dedicated in-cluster dataflow diagram, along with what
+it will detail: the `Deployment`'s replicas ≥ 2 with readiness probing `/up` and a
+PodDisruptionBudget, the **HPA** scaling replicas, the **Cluster Autoscaler** scaling
+node groups, and the **PVC** on the EBS CSI driver (gp3) for stateful add-ons like
+Prometheus. Pods reach RDS on 5432, S3 for media, and SSM for secrets via IRSA; nodes
+pull images from ECR; egress from private subnets goes NAT gateway → **Network Firewall**
+(egress inspection) per AZ. Security groups scope every hop; nothing in a private subnet
+is internet-reachable.
 
 **Reliability and recovery.** Within the region: Multi-AZ everything, synchronous RDS
 replication to the standby, and **AWS Backup** running RDS and EBS plans with
