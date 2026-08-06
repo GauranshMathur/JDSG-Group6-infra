@@ -47,8 +47,15 @@ Where things are written down:
 ## Current milestone
 
 **I-1a — design agreed, toolchain verification outstanding.** The design and the diagram
-exist. What remains are the questions in `docs/floci.md`, the load-bearing one being whether
-the community EKS module applies against the emulator or forces a hand-rolled config.
+exist. What remains are the three questions in `docs/floci.md`, all of which need floci
+actually running and are expected to be answered by the first CI apply.
+
+The fourth — whether the community EKS module applies against the emulator — is answered,
+and answered by reading the module rather than applying it. It resolved into a design choice
+instead: the module is two variables from applying (`encryption_config = null`,
+`enable_irsa = false`), so the question is whether to accept a cluster that no longer matches
+the reference design, or hand-roll. That decision is open in `docs/open-questions.md` and
+gets an ADR before I-1b starts.
 
 **The work is two independent tracks — [ADR 0001](docs/adr/0001-terraform-verifies-runtime-deploys.md).**
 

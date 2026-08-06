@@ -29,18 +29,53 @@ manifests, and images come from GHCR rather than the emulated ECR.
 
 ## Track A — Terraform
 
-### Do the four verification questions in `floci.md` have the answers we expect?
+### Community EKS module with overrides, or hand-rolled?
 
-Whether the community EKS module applies or forces a hand-rolled config; whether inert-tier
-resources really apply; what floci returns on an unimplemented operation; and whether
-metadata-only mode covers the CI gate.
+`floci.md` now records what the module actually does at defaults: the add-ons and access
+entries we expected to block it are off, and what blocks it instead is `encryption_config`
+(defaulting to `{}`, which is not `null`, so the gate opens) and IRSA's `tls_certificate`
+data source making a real outbound TLS handshake. Both are one variable each —
+`encryption_config = null`, `enable_irsa = false`.
 
-**Why it matters:** the first decides how the Terraform is written at all. The third decides
-whether a failure is a clean error Terraform can report or something that looks like success —
-and a misconfiguration that looks like success is the worst outcome available.
+So this is no longer "does it work". It is a choice between two configurations that are both
+achievable:
+
+- **The module, with floci-specific overrides.** Least Terraform written, and it inherits the
+  module's IAM, security-group and node-group scaffolding. The cost is that the applied
+  cluster is no longer the cluster the reference design describes — secrets encryption and
+  IRSA are exactly the kind of production shape the design is meant to demonstrate, and
+  turning them off to satisfy the emulator inverts the relationship. It also drags in a
+  nested registry module (`terraform-aws-modules/kms/aws`), against the one-root-no-modules
+  rule.
+- **Hand-rolled.** More Terraform, and none of it inherited. But the resources applied are
+  exactly the resources chosen, the emulator's gaps are visible in the config rather than
+  hidden behind a variable, and the inert tier gets labelled the way `CLAUDE.md` requires.
+
+**Why it matters:** it decides how every Terraform file in I-1b is written, and it is the
+kind of choice that is expensive to reverse once the whole design is expressed one way.
+
+**When:** before I-1b starts. It has a real alternative and a real cost either way, so it
+gets an ADR rather than a line in a document.
+
+### Do the three remaining verification questions in `floci.md` behave as expected?
+
+Whether inert-tier resources really apply; what floci returns on an unimplemented operation;
+and whether metadata-only mode covers the CI gate.
+
+**Why it matters:** the second decides whether a failure is a clean error Terraform can report
+or something that looks like success — and a misconfiguration that looks like success is the
+worst outcome available. It is also the only one of the three that reading a plan cannot
+catch.
 
 **When:** answered by the first CI run of I-1b, rather than by more reading. A red job is a
-faster and more reliable answer than the documentation has given so far.
+faster and more reliable answer than the documentation has given so far. All three settle on
+one apply.
+
+**Note on where this gets answered.** These need floci running, and pulling its image needs a
+container registry. Any environment with restricted egress — a sandboxed agent session, a
+locked-down runner — will resolve the manifest and then fail on the blob CDN, for Docker Hub
+and ECR Public alike. GitHub Actions has no such restriction, which is the other reason the
+answers come from CI.
 
 ### Does the state bucket bootstrap cleanly?
 
@@ -100,6 +135,23 @@ k6 and Toxiproxy are the leading candidates, deliberately undecided.
 ---
 
 ## Delivery
+
+### What answers the three remaining questions, given no Terraform may be written yet?
+
+`CLAUDE.md` says no Terraform until I-1a's questions are answered. The roadmap and the entry
+above say those answers come from the first CI apply. An apply needs Terraform, so as written
+the two rules cannot both be satisfied and I-1b cannot start.
+
+The obvious way out is a **verification spike**: a deliberately minimal, throwaway config —
+one inert-tier resource of each kind, plus one deliberately unsupported operation to force the
+question-2 case — and a CI job that applies it against floci. It is not the reference design,
+it answers all three at once, and it gets deleted afterwards.
+
+**Why it matters:** it is the only thing standing between here and I-1b, and it is a rule
+conflict rather than a technical problem, so it will not resolve itself.
+
+**When:** now. Whichever way it goes, one of the two rules needs rewording so the next person
+does not hit the same wall.
 
 ### Required status checks
 
