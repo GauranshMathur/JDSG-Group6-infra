@@ -85,13 +85,25 @@ Shape of the Terraform, settled at the same time:
 
 ## The reference architecture
 
-What the diagram shows, in words — four layers:
+What the diagram shows, in words — five layers:
 
 **Edge (global).** Users resolve DNS at Route 53 and hit **CloudFront** (the CDN) over 443,
 with **WAF** attached (managed rule sets) and the certificate from **ACM**. CloudFront's
-origin is the ALB — so the ALB is the only ingress into the VPC, and it never sees the
-internet directly. **IAM** (roles, IRSA for pods) and **KMS** (encryption keys for RDS, S3
-and EBS) sit at this layer too, since they are global services everything else leans on.
+origin is the ALB — so the ALB is the only ingress into the perimeter VPC, and it never
+sees the internet directly. **IAM** (roles, IRSA for pods) and **KMS** (encryption keys for
+RDS, S3 and EBS) sit at this layer too, since they are global services everything else
+leans on.
+
+**Network topology.** Three VPCs, each with its own /16, connected by a **Transit
+Gateway** whose attachment ENIs are drawn where they sit. The **perimeter VPC**
+(10.0.0.0/16) holds everything that faces the internet: the internet gateway, the ALB and
+NLB behind their security group, and a NAT gateway and Network Firewall endpoint per
+public subnet (10.0.0.0/20 and 10.0.16.0/20, one per AZ). The **application VPC**
+(10.1.0.0/16) holds the EKS node groups and RDS in private subnets (10.1.0.0/20 and
+10.1.16.0/20) and has no internet gateway at all — every packet in or out crosses the
+transit gateway to the perimeter. A **DR VPC** (10.2.0.0/16) stands ready in the DR
+region, reached over inter-region TGW peering. Security groups are drawn where they wrap:
+the load balancers, each zone's nodes, and the database pair.
 
 **Ingress into the cluster.** Two load balancer types, deliberately: the **ALB** is the L7
 path — created and kept in sync by the AWS Load Balancer Controller *from* the Kubernetes
@@ -112,10 +124,11 @@ it will detail: the `Deployment`'s replicas ≥ 2 with readiness probing `/up` a
 PodDisruptionBudget, the **HPA** scaling replicas, the **Cluster Autoscaler** scaling
 node groups, and the **PVC** on the EBS CSI driver (gp3) for stateful add-ons like
 Prometheus. Pods reach RDS on 5432, S3 for media, and SSM for secrets via IRSA; nodes
-pull images from ECR; egress from private subnets goes NAT gateway → **Network Firewall**
-(egress inspection) → internet gateway, per AZ — the same internet gateway CloudFront's
-origin traffic enters through, since it is the VPC's one door in either direction.
-Security groups scope every hop; nothing in a private subnet is internet-reachable.
+pull images from ECR; egress leaves the application VPC over the transit gateway, then
+runs NAT gateway → **Network Firewall** (egress inspection) → internet gateway in the
+perimeter VPC, per AZ — the same internet gateway ingress enters through, the perimeter's
+one door in either direction. Security groups scope every hop; nothing in a private
+subnet is internet-reachable.
 
 **Reliability and recovery.** Within the region: Multi-AZ everything, synchronous RDS
 replication to the standby, and **AWS Backup** running RDS and EBS plans with
