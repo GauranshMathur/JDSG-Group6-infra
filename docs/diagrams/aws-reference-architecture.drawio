@@ -94,6 +94,9 @@
         <mxCell id="clusternote" parent="1" style="text;html=1;align=right;verticalAlign=middle;fontSize=10;fontStyle=2;fontColor=#7F8C99;whiteSpace=wrap;" value="full in-cluster dataflow: separate diagram" vertex="1">
           <mxGeometry height="22" width="420" x="1180" y="872" as="geometry" />
         </mxCell>
+        <mxCell id="igw" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#8C4FFF;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.internet_gateway;" value="Internet gateway&#xa;(all VPC ingress / egress)" vertex="1">
+          <mxGeometry height="52" width="52" x="959" y="344" as="geometry" />
+        </mxCell>
         <mxCell id="netfwA" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#DD344C;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.network_firewall;" value="Network Firewall&#xa;(egress inspection)" vertex="1">
           <mxGeometry height="52" width="52" x="380" y="467" as="geometry" />
         </mxCell>
@@ -172,8 +175,29 @@
         <mxCell id="e_users_cf" edge="1" parent="1" source="users" target="cf" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#232F3E;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_cf_alb" edge="1" parent="1" source="cf" target="alb" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#232F3E;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
+        <mxCell id="e_cf_igw" edge="1" parent="1" source="cf" target="igw" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#232F3E;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
           <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_igw_alb" edge="1" parent="1" source="igw" target="alb" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#232F3E;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_fwA_igw" edge="1" parent="1" source="netfwA" target="igw" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#248814;dashed=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.635;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="406" y="400" />
+              <mxPoint x="940" y="400" />
+              <mxPoint x="940" y="377" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_fwB_igw" edge="1" parent="1" source="netfwB" target="igw" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#248814;dashed=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.635;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1616" y="400" />
+              <mxPoint x="1030" y="400" />
+              <mxPoint x="1030" y="377" />
+            </Array>
+          </mxGeometry>
         </mxCell>
         <mxCell id="e_alb_nodeA" edge="1" parent="1" source="alb" target="ec2boxA" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#232F3E;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.375;entryDx=0;entryDy=0;">
           <mxGeometry relative="1" as="geometry">

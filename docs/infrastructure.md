@@ -113,8 +113,9 @@ PodDisruptionBudget, the **HPA** scaling replicas, the **Cluster Autoscaler** sc
 node groups, and the **PVC** on the EBS CSI driver (gp3) for stateful add-ons like
 Prometheus. Pods reach RDS on 5432, S3 for media, and SSM for secrets via IRSA; nodes
 pull images from ECR; egress from private subnets goes NAT gateway → **Network Firewall**
-(egress inspection) per AZ. Security groups scope every hop; nothing in a private subnet
-is internet-reachable.
+(egress inspection) → internet gateway, per AZ — the same internet gateway CloudFront's
+origin traffic enters through, since it is the VPC's one door in either direction.
+Security groups scope every hop; nothing in a private subnet is internet-reachable.
 
 **Reliability and recovery.** Within the region: Multi-AZ everything, synchronous RDS
 replication to the standby, and **AWS Backup** running RDS and EBS plans with
