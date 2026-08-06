@@ -77,6 +77,60 @@ export AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-e
 - Not supported: cluster config/version updates, add-ons, identity provider configs,
   access entries, encryption config.
 
+### What the community EKS module does at defaults — and it is not what we expected
+
+Verified by reading `terraform-aws-modules/eks` **v21.24.1** rather than by applying it —
+the emulator is not needed to find out which resources a module declares and which of them
+its defaults actually instantiate.
+
+The expectation recorded here was that add-ons and access entries would be the blockers.
+They are not: **all four of the unsupported EKS resource types are off at defaults.**
+
+| Module resource | Gate | Default | Instantiated? |
+| --- | --- | --- | --- |
+| `aws_eks_addon` (×2) | `var.addons != null` | `null` | No |
+| `aws_eks_identity_provider_config` | `var.identity_providers != null` | `null` | No |
+| `aws_eks_access_entry` | `local.merged_access_entries` | `access_entries = {}`, `enable_cluster_creator_admin_permissions = false` | No |
+| `aws_eks_access_policy_association` | `local.flattened_access_entries` | — | No |
+
+Two things the module does do by default are the real obstacles:
+
+- **Encryption config is on.** `var.encryption_config` defaults to `{}`, and the gate is
+  `local.enable_encryption_config = var.encryption_config != null`. An empty object is not
+  null, so the gate opens: the cluster gets a `dynamic "encryption_config"` block with
+  `resources = ["secrets"]`, and `create_kms_key` (default `true`) provisions a KMS key to
+  fill it. Every `CreateCluster` therefore carries an `encryptionConfig` — the one item on
+  the unsupported list that is reached without asking for it. Setting
+  `encryption_config = null` closes it.
+- **IRSA does real network I/O.** `enable_irsa` and `include_oidc_root_ca_thumbprint` both
+  default to `true`, which instantiates `data "tls_certificate" "this"` against
+  `aws_eks_cluster.this[0].identity[0].oidc[0].issuer` and makes a genuine outbound TLS
+  handshake to read a thumbprint. This fails on whatever floci returns for the issuer —
+  absent, or synthetic and undialable — and it fails for a reason that has nothing to do
+  with EKS API coverage. `enable_irsa = false` closes it.
+
+So the module is not categorically incompatible; it is two variables away from applying.
+That turns the question from a compatibility one into a **design** one — a cluster
+configured `encryption_config = null, enable_irsa = false` is no longer the cluster the
+reference design describes, which is most of the reason for writing the Terraform against
+the AWS provider at all. Recorded as an open decision in
+[`open-questions.md`](open-questions.md).
+
+Two smaller findings, worth having before the choice is made:
+
+- The module pulls a **nested registry module**, `terraform-aws-modules/kms/aws` v4.0.0, to
+  create that key. Adopting it means adopting a module tree, which sits badly with the
+  one-root-no-modules rule in `CLAUDE.md`.
+- Managed node groups are a submodule declaring `aws_eks_node_group` alongside an
+  `aws_launch_template` and an `aws_placement_group`. Since floci's node groups are metadata
+  and its EC2 tier is per-instance containers, whether those two apply is unknown and is
+  folded into question 1 below.
+
+Only one of the two obstacles is an EKS coverage gap at all. Encryption config is on floci's
+unsupported list; the IRSA one is a `tls_certificate` data source reaching the network, which
+would behave the same way against any endpoint that does not serve a real OIDC issuer. Worth
+separating, because only the first would be fixed by floci implementing more of the EKS API.
+
 ## How it differs from real AWS
 
 The differences cluster into two kinds.
@@ -163,18 +217,24 @@ app. Load and latency figures measured against the emulator would describe the e
 ## To verify in I-1a — things the docs left unclear
 
 Narrowed by ADR 0001. The items about running the app on emulated services are gone, since
-the app no longer runs there; what remains is about the Terraform track:
+the app no longer runs there; what remains is about the Terraform track. **Question 1 —
+whether the community EKS module applies cleanly — is answered above**, and answered
+without the emulator, because it turned out to be a question about the module rather than
+about floci. Three remain, and all three need floci actually running:
 
-1. Does the standard `terraform-aws-modules/eks` module `apply` cleanly, or does it touch
-   unsupported APIs (add-ons, access entries) that force a slimmer hand-rolled config?
-   Expect hand-rolled.
-2. Does an inert-tier resource — an `aws_lb`, a `aws_cloudfront_distribution`, a
+1. Does an inert-tier resource — an `aws_lb`, a `aws_cloudfront_distribution`, a
    `aws_wafv2_web_acl` — actually apply, or does "supported" turn out shallower than the
-   service list claims?
-3. What does floci return when an apply reaches an unimplemented operation: a clean error
+   service list claims? Managed node groups belong here too: `aws_eks_node_group` alongside
+   an `aws_launch_template` and an `aws_placement_group`.
+2. What does floci return when an apply reaches an unimplemented operation: a clean error
    Terraform can report, or something that looks like success?
-4. Does `FLOCI_SERVICES_EKS_MOCK=true` cover enough for the CI gate, so the Terraform job
+3. Does `FLOCI_SERVICES_EKS_MOCK=true` cover enough for the CI gate, so the Terraform job
    needs no Docker socket?
+
+All three are settled by one apply, which is why the roadmap expects them to come from the
+first CI run rather than from more reading. Question 2 is the one to be careful about: a
+misconfiguration that reports success is the worst outcome available, and it is the only
+one of the three that cannot be spotted by reading a plan.
 
 Moot under ADR 0001, kept only as curiosities: whether Rails connects through the RDS auth
 proxy, whether Active Storage works against floci's S3, and how permissive the emulated IAM
