@@ -138,8 +138,8 @@ The differences cluster into two kinds.
 **Fundamental to being an emulator** — these hold for any local emulation and are the
 accepted cost of never having a real account:
 
-- **The network is not real.** VPCs, subnets, security groups, NAT and internet gateways
-  are stored as metadata — Terraform creates and reads them happily, but nothing enforces
+- **The network is not real.** VPCs, subnets, security groups, NAT, internet and transit
+  gateways are stored as metadata — Terraform creates and reads them happily, but nothing enforces
   them. There is no packet filtering; Docker bridge networking does the actual routing.
 - **No region isolation** — every region name points at the same emulator; no cross-region
   replication.
@@ -178,7 +178,7 @@ supported. What varies is whether the emulated thing *does* anything:
 | Tier | Resources | What `terraform apply` gives you |
 | --- | --- | --- |
 | **Does real work** | EKS (real k3s), RDS (real PostgreSQL), ElastiCache (real Redis), S3, ECR, SSM | A thing that functions — a Kubernetes API to `kubectl` into, a database to connect to |
-| **Applies, but inert** | VPC, subnets, security groups, NAT and internet gateways, ALB, NLB, CloudFront, WAF, ACM, Route 53, AWS Backup | State you can create, describe and tag. Nothing routes, filters, caches or enforces |
+| **Applies, but inert** | VPC, subnets, security groups, NAT and internet gateways, transit gateway and its attachments, ALB, NLB, CloudFront, WAF, ACM, Route 53, AWS Backup | State you can create, describe and tag. Nothing routes, filters, caches or enforces |
 | **Not there at all** | Network Firewall | An error that halts the apply |
 
 The inert tier is the large one, and it is not a defect — it is what an emulator is. It is
