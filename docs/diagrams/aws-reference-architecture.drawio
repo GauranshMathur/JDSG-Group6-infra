@@ -121,13 +121,10 @@
         <mxCell id="rds2" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#527FFF;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.rds;" value="RDS PostgreSQL&#xa;standby (Multi-AZ)" vertex="1">
           <mxGeometry height="60" width="60" x="1145" y="1430" as="geometry" />
         </mxCell>
-        <mxCell id="igw" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#8C4FFF;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.internet_gateway;" value="Internet gateway&#xa;(all VPC ingress / egress)" vertex="1">
-          <mxGeometry height="52" width="52" x="959" y="344" as="geometry" />
-        </mxCell>
         <mxCell id="netfwA" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#DD344C;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.network_firewall;" value="Network Firewall&#xa;(egress inspection)" vertex="1">
           <mxGeometry height="52" width="52" x="380" y="467" as="geometry" />
         </mxCell>
-        <mxCell id="nat1" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#8C4FFF;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.nat_gateway;" value="NAT gateway" vertex="1">
+        <mxCell id="nat1" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#8C4FFF;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.nat_gateway;" value="NAT gateway&#xa;(cluster egress only)" vertex="1">
           <mxGeometry height="52" width="52" x="520" y="467" as="geometry" />
         </mxCell>
         <mxCell id="nlb" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.network_load_balancer;" value="NLB&#xa;(L4 — stands ready)" vertex="1">
@@ -136,26 +133,29 @@
         <mxCell id="alb" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.application_load_balancer;" value="ALB&#xa;(L7 — CloudFront&#39;s origin)" vertex="1">
           <mxGeometry height="56" width="56" x="957" y="465" as="geometry" />
         </mxCell>
-        <mxCell id="nat2" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#8C4FFF;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.nat_gateway;" value="NAT gateway" vertex="1">
+        <mxCell id="nat2" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#8C4FFF;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.nat_gateway;" value="NAT gateway&#xa;(cluster egress only)" vertex="1">
           <mxGeometry height="52" width="52" x="1450" y="467" as="geometry" />
         </mxCell>
         <mxCell id="netfwB" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#DD344C;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.network_firewall;" value="Network Firewall&#xa;(egress inspection)" vertex="1">
           <mxGeometry height="52" width="52" x="1590" y="467" as="geometry" />
         </mxCell>
+        <mxCell id="acctbox" parent="1" style="fillColor=none;strokeColor=#7F8C99;dashed=1;verticalAlign=top;align=left;spacingLeft=8;fontStyle=2;fontColor=#7F8C99;whiteSpace=wrap;html=1;fontSize=10;" value="account-wide — attached everywhere, on no request path" vertex="1">
+          <mxGeometry height="122" width="330" x="300" y="178" as="geometry" />
+        </mxCell>
         <mxCell id="iam" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#DD344C;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.identity_and_access_management;" value="IAM&#xa;(roles, IRSA)" vertex="1">
-          <mxGeometry height="60" width="60" x="340" y="195" as="geometry" />
+          <mxGeometry height="60" width="60" x="330" y="200" as="geometry" />
         </mxCell>
         <mxCell id="kms" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#DD344C;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.key_management_service;" value="KMS&#xa;(keys for RDS, S3, EBS)" vertex="1">
-          <mxGeometry height="60" width="60" x="470" y="195" as="geometry" />
+          <mxGeometry height="60" width="60" x="455" y="200" as="geometry" />
         </mxCell>
-        <mxCell id="acm" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#DD344C;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.certificate_manager;" value="ACM&#xa;(TLS certificates)" vertex="1">
-          <mxGeometry height="60" width="60" x="835" y="195" as="geometry" />
+        <mxCell id="acm" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#DD344C;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.certificate_manager;" value="ACM&#xa;(TLS: CloudFront + ALB)" vertex="1">
+          <mxGeometry height="60" width="60" x="1070" y="195" as="geometry" />
         </mxCell>
         <mxCell id="cf" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#8C4FFF;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudfront;" value="CloudFront&#xa;(CDN)" vertex="1">
           <mxGeometry height="60" width="60" x="955" y="195" as="geometry" />
         </mxCell>
-        <mxCell id="waf" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#DD344C;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.waf;" value="WAF&#xa;(managed rules, on CloudFront)" vertex="1">
-          <mxGeometry height="60" width="60" x="1085" y="195" as="geometry" />
+        <mxCell id="waf" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#DD344C;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.waf;" value="WAF&#xa;(filters requests)" vertex="1">
+          <mxGeometry height="60" width="60" x="852" y="195" as="geometry" />
         </mxCell>
         <mxCell id="r53" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#8C4FFF;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.route_53;" value="Route 53&#xa;(DNS; health-check failover to DR)" vertex="1">
           <mxGeometry height="60" width="60" x="1450" y="195" as="geometry" />
@@ -201,6 +201,9 @@
         </mxCell>
         <mxCell id="gha" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#232F3E;fontSize=11;" value="GitHub Actions&#xa;(release pipeline)" vertex="1">
           <mxGeometry height="60" width="150" x="50" y="1660" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7F8C99;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=10;fontColor=#232F3E;" value="&lt;b&gt;Legend — when each line comes into play&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#232F3E&quot;&gt;&#9473;&#9473;&lt;/font&gt; user traffic, request and response — always via CloudFront &#8594; ALB&lt;br&gt;&lt;font color=&quot;#248814&quot;&gt;&#9548;&#9548;&lt;/font&gt; cluster-started egress — image pulls, packages, external APIs&lt;br&gt;&lt;font color=&quot;#527FFF&quot;&gt;&#9548;&#9548;&lt;/font&gt; database replication&lt;br&gt;&lt;font color=&quot;#7AA116&quot;&gt;&#9548;&#9548;&lt;/font&gt; backups and cross-region copies&lt;br&gt;&lt;font color=&quot;#00A4A6&quot;&gt;&#9548;&#9548;&lt;/font&gt; DR failover and TGW peering&lt;br&gt;&lt;font color=&quot;#7F8C99&quot;&gt;&#9548;&#9548;&lt;/font&gt; DNS, sign-in, image delivery, logs" vertex="1">
+          <mxGeometry height="150" width="380" x="50" y="1770" as="geometry" />
         </mxCell>
         <mxCell id="e_users_cf" edge="1" parent="1" source="users" target="cf" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#232F3E;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
           <mxGeometry relative="1" as="geometry" />
@@ -354,6 +357,21 @@
         </mxCell>
         <mxCell id="drtgw" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#8C4FFF;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.transit_gateway;" value="Transit Gateway&#xa;(inter-region peering)" vertex="1">
           <mxGeometry height="60" width="60" x="2010" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="e_alb_cognito" edge="1" parent="1" source="alb" target="cognito" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#7F8C99;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1022" y="493" />
+              <mxPoint x="1022" y="320" />
+              <mxPoint x="1275" y="320" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="igw" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#8C4FFF;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.internet_gateway;" value="Internet gateway&#xa;(all VPC ingress / egress)" vertex="1">
+          <mxGeometry height="52" width="52" x="959" y="344" as="geometry" />
+        </mxCell>
+        <mxCell id="cognito" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#ffffff;fillColor=#DD344C;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cognito;" value="Cognito&#xa;(sign-in at ALB — reference only)" vertex="1">
+          <mxGeometry height="60" width="60" x="1245" y="195" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

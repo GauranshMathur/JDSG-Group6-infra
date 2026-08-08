@@ -90,9 +90,13 @@ What the diagram shows, in words — five layers:
 **Edge (global).** Users resolve DNS at Route 53 and hit **CloudFront** (the CDN) over 443,
 with **WAF** attached (managed rule sets) and the certificate from **ACM**. CloudFront's
 origin is the ALB — so the ALB is the only ingress into the perimeter VPC, and it never
-sees the internet directly. **IAM** (roles, IRSA for pods) and **KMS** (encryption keys for
-RDS, S3 and EBS) sit at this layer too, since they are global services everything else
-leans on.
+sees the internet directly. **Cognito** is drawn beside the edge as the reference sign-in
+path — the ALB authenticates via OIDC against a user pool before forwarding — and is
+**reference-only**: the running app owns its authentication in Rails, so nothing
+Cognito-shaped is realized locally or asked of the app. **IAM** (roles, IRSA for pods) and
+**KMS** (encryption keys for RDS, S3 and EBS) sit at this layer too, since they are global
+services everything else leans on — drawn parked in an account-wide box, because they
+attach everywhere and sit on no request path.
 
 **Network topology.** Three VPCs, each with its own /16, connected by a **Transit
 Gateway** whose attachment ENIs are drawn where they sit. The **perimeter VPC**
@@ -101,7 +105,9 @@ NLB behind their security group, and a NAT gateway and Network Firewall endpoint
 public subnet (10.0.0.0/20 and 10.0.16.0/20, one per AZ). The **application VPC**
 (10.1.0.0/16) holds the EKS node groups and RDS in private subnets (10.1.0.0/20 and
 10.1.16.0/20) and has no internet gateway at all — every packet in or out crosses the
-transit gateway to the perimeter. A **DR VPC** (10.2.0.0/16) stands ready in the DR
+transit gateway to the perimeter. The NAT gateways carry **cluster-started egress only** —
+image pulls, packages, calls out to external APIs; user responses return the way they
+came, back through the ALB and CloudFront, and never touch a NAT. A **DR VPC** (10.2.0.0/16) stands ready in the DR
 region, reached over inter-region TGW peering. Security groups are drawn where they wrap:
 the load balancers, each zone's nodes, and the database pair.
 
