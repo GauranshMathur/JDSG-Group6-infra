@@ -1,0 +1,139 @@
+name: Spike — CloudFront provider bisect
+
+# Answers one question: does any AWS provider version apply a CloudFront
+# distribution against floci, or is v6.59.0's segfault the whole family's
+# behaviour? See spike/cloudfront-provider/main.tf. Deleted with the spike.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "spike/cloudfront-provider/**"
+      - ".github/workflows/spike-cloudfront-provider.yml"
+
+concurrency:
+  group: spike-cloudfront-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: "aws ${{ matrix.aws_provider }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      # Every version must report. A pass at one end and a crash at the other
+      # is the interesting result, and fail-fast would hide half of it.
+      fail-fast: false
+      matrix:
+        aws_provider:
+          - "4.67.0"
+          - "5.0.0"
+          - "5.31.0"
+          - "5.70.0"
+          - "6.0.0"
+          - "6.59.0" # the control: known to crash
+
+    services:
+      floci:
+        image: floci/floci:latest
+        ports:
+          - 4566:4566
+        env:
+          FLOCI_STORAGE_MODE: memory
+
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.1
+          terraform_wrapper: false
+
+      - name: Wait for floci to answer
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 60); do
+            if curl -fsS --max-time 5 http://localhost:4566/ >/dev/null 2>&1; then
+              echo "floci is answering on :4566"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::floci never answered on :4566."
+          exit 1
+
+      - name: Pin the provider version
+        working-directory: spike/cloudfront-provider
+        run: |
+          set -euo pipefail
+          cat > versions.tf <<EOF
+          terraform {
+            required_version = ">= 1.10"
+            required_providers {
+              aws = {
+                source  = "hashicorp/aws"
+                version = "${{ matrix.aws_provider }}"
+              }
+            }
+          }
+          EOF
+          cat versions.tf
+
+      # Every outcome is a result, so the step records rather than only failing.
+      - name: Apply the distribution
+        id: apply
+        continue-on-error: true
+        working-directory: spike/cloudfront-provider
+        run: |
+          set -euo pipefail
+          terraform init -no-color
+
+          set +e
+          terraform apply -auto-approve -no-color > apply.log 2>&1
+          status=$?
+          set -e
+
+          cat apply.log
+
+          verdict="unknown"
+          if [ "$status" -eq 0 ]; then
+            verdict="applied"
+          elif grep -q "plugin crashed\|nil pointer dereference" apply.log; then
+            verdict="crashed"
+          else
+            verdict="failed"
+          fi
+
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Report
+        if: always()
+        run: |
+          set -euo pipefail
+          version='${{ matrix.aws_provider }}'
+          verdict='${{ steps.apply.outputs.verdict }}'
+
+          case "$verdict" in
+            applied)
+              line="**\`$version\` — APPLIED.** floci's response is readable by this provider." ;;
+            crashed)
+              line="\`$version\` — crashed (nil pointer in the CloudFront read-back)." ;;
+            failed)
+              line="\`$version\` — failed, but did *not* crash. Read the log: a clean error is a different finding." ;;
+            *)
+              line="\`$version\` — no verdict; the step did not complete." ;;
+          esac
+
+          echo "$line" >> "$GITHUB_STEP_SUMMARY"
+          echo "$line"
