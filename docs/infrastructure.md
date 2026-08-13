@@ -17,6 +17,12 @@ zones, encryption and identity (KMS, IAM/IRSA), and the backup and DR-region sto
 
 ![AWS reference architecture](diagrams/aws-reference-architecture.svg)
 
+The diagram is the **reference design**, not an inventory of what the Terraform builds.
+One difference is load-bearing and worth knowing before reading further: **CloudFront is
+drawn but is not in the Terraform** ([ADR 0002](adr/0002-cloudfront-omitted-from-terraform.md)),
+because it cannot be applied against the emulator at all. The diagram does not yet mark
+this, which means it currently overstates what is realized.
+
 The source of truth is
 [`diagrams/aws-reference-architecture.drawio`](diagrams/aws-reference-architecture.drawio).
 **Open it online, straight from this repository:**
@@ -90,7 +96,16 @@ What the diagram shows, in words — five layers:
 **Edge (global).** Users resolve DNS at Route 53 and hit **CloudFront** (the CDN) over 443,
 with **WAF** attached (managed rule sets) and the certificate from **ACM**. CloudFront's
 origin is the ALB — so the ALB is the only ingress into the perimeter VPC, and it never
-sees the internet directly. **Cognito** is drawn beside the edge as the reference sign-in
+sees the internet directly.
+
+> **CloudFront is described here but is not in the Terraform**
+> ([ADR 0002](adr/0002-cloudfront-omitted-from-terraform.md)). floci accepts
+> `CreateDistribution` and then returns an object that segfaults the AWS provider reading
+> it back — on every provider version from 4.67 to 6.59, so it is the resource's
+> behaviour against this emulator rather than a bug awaiting a fix. The Terraform's edge
+> chain therefore begins at the ALB. This is the one place the "apply the inert tier and
+> label it" rule is not followed, and the gap is deliberate rather than an oversight.
+> WAF and ACM are unaffected: a Web ACL applies cleanly. **Cognito** is drawn beside the edge as the reference sign-in
 path — the ALB authenticates via OIDC against a user pool before forwarding — and is
 **reference-only**: the running app owns its authentication in Rails, so nothing
 Cognito-shaped is realized locally or asked of the app. **IAM** (roles, IRSA for pods) and

@@ -178,8 +178,9 @@ supported. What varies is whether the emulated thing *does* anything:
 | Tier | Resources | What `terraform apply` gives you |
 | --- | --- | --- |
 | **Does real work** | EKS (real k3s), RDS (real PostgreSQL), ElastiCache (real Redis), S3, ECR, SSM | A thing that functions — a Kubernetes API to `kubectl` into, a database to connect to |
-| **Applies, but inert** | VPC, subnets, security groups, NAT and internet gateways, transit gateway and its attachments, ALB, NLB, CloudFront, WAF, ACM, Route 53, AWS Backup | State you can create, describe and tag. Nothing routes, filters, caches or enforces |
-| **Not there at all** | Network Firewall | An error that halts the apply |
+| **Applies, but inert** | VPC, subnets, security groups, NAT and internet gateways, transit gateway and its attachments, ALB, NLB, WAF, ACM, Route 53, AWS Backup | State you can create, describe and tag. Nothing routes, filters, caches or enforces |
+| **Not there at all** | Network Firewall, Global Accelerator, EC2 placement groups | An error that halts the apply — cleanly, and Terraform reports it |
+| **Accepted, then breaks the provider** | CloudFront | The create is accepted and the read-back segfaults the AWS provider. Worse than absent, because it looks supported until it is applied — [ADR 0002](adr/0002-cloudfront-omitted-from-terraform.md) |
 
 The inert tier is the large one, and it is not a defect — it is what an emulator is. It is
 still worth applying, because it makes the Terraform match the diagram and costs nothing;

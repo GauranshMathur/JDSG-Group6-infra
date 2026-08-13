@@ -27,14 +27,14 @@ configuration stands up; never runs the app.
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| I-2.1 | The reference design exists as Terraform — VPC, EKS, RDS, S3, ECR, IAM, SSM and the edge chain | Planned — I-1b |
+| I-2.1 | The reference design exists as Terraform — VPC, EKS, RDS, S3, ECR, IAM, SSM and the edge chain | Planned — I-1b. **CloudFront is excluded by [ADR 0002](docs/adr/0002-cloudfront-omitted-from-terraform.md)**: it cannot be applied against the emulator on any provider version, so the Terraform's edge chain starts at the ALB. WAF, ACM and Route 53 are unaffected |
 | I-2.2 | One root, no modules, files split by concern | Planned |
 | I-2.3 | `terraform fmt -check` passes, and CI fails on any drift | Planned |
 | I-2.4 | `terraform validate` passes | Planned |
 | I-2.5 | `terraform plan` is saved and published as a build artifact, and the apply applies *that* plan | Planned |
 | I-2.6 | `terraform apply` against a clean emulator succeeds, and is a CI gate | Planned |
 | I-2.7 | State lives in S3 with locking, never on disk and never committed | Planned — S3 backend on the emulator; Terraform 1.10+ gives S3-native locking via `use_lockfile`, so no DynamoDB table |
-| I-2.8 | Resources that apply but do nothing are labelled as such, so nobody reads them as functional | Planned |
+| I-2.8 | Resources that apply but do nothing are labelled as such, so nobody reads them as functional | Planned. The converse now needs labelling too: CloudFront is in the design and *not* in the Terraform ([ADR 0002](docs/adr/0002-cloudfront-omitted-from-terraform.md)), so the gap reads as a decision rather than an omission |
 | I-2.9 | Terraform describes AWS only; Kubernetes objects are manifests | Planned — ADR 0001 |
 | I-2.10 | No real cloud resource is ever created | **Met, and permanent.** The provider points at the emulator; there is no AWS account |
 
