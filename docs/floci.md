@@ -257,6 +257,12 @@ Two did not:
   provider. That contradicts what `CLAUDE.md` and the design both assume, and it is a
   constraint on I-1b rather than a bug to fix here — recorded as an open question.
 
+  **The plan is fine, though**, which narrows the problem usefully: the distribution
+  appeared in all thirteen planned resources, so `fmt`, `validate` and `plan` all handle
+  it and only `apply` dies. CloudFront can stay in the configuration and in the published
+  plan artifact; what is unreachable is a state entry, on an emulator that would not have
+  served traffic through it anyway.
+
 ### 2. What happens on an unimplemented operation? — It fails cleanly, in two ways
 
 The good answer, and the one that makes `terraform apply` worth using as a CI gate. Two
