@@ -103,22 +103,22 @@ This is the one workflow that pushes to `main` directly rather than going throug
 request. That is deliberate: the SVG is derived output, not authored work. Reviewing it would
 mean reviewing a rendering.
 
-## `spike-floci.yml` — temporary
+## `spike-floci.yml` — existed, and is gone
 
-The verification spike, and it leaves with the spike. It runs floci as a service container
-and applies `spike/floci-verification/` against it, answering the three questions left open
-in [`floci.md`](floci.md); the run's job summary is written to be the answer rather than
-something to be reconstructed from a log.
+Worth a paragraph because I-1b's Terraform job inherits two of its findings.
 
-Two things about its shape are deliberate. **A service container gets no Docker socket**,
-which is not a limitation being worked around — it is question 3, so the constraint is the
-experiment. And **the "unsupported" step is expected to fail**, so the job tolerates it and
-reports the exit status instead: a clean failure is the good answer, and a success would
-mean floci answers unimplemented operations with something shaped like success, which is
-what would make `terraform apply` worthless as a gate.
+It ran floci as a service container and applied a throwaway config against it, answering
+the three questions in [`floci.md`](floci.md), and was deleted the moment those answers
+were recorded — a throwaway probe that outlives its question becomes a workflow nobody
+dares touch. The
+[run](https://github.com/GauranshMathur/JDSG-Group6-infra/actions/runs/31680455895) is the
+evidence; the config is in this repository's history at `8cc69a9`.
 
-It is `workflow_dispatch` plus pull requests touching `spike/**`, and **never a required
-check**. A throwaway probe that gates merges is a throwaway probe nobody dares delete.
+**What the Terraform job should keep from it.** A service container gets no Docker socket,
+and with `FLOCI_SERVICES_EKS_MOCK=true` the EKS resources applied anyway — so the gate
+needs no privileged access to the runner's daemon. And an `aws_lb` takes a full minute to
+create against the emulator, so with two load balancers in the design, expect the job's
+duration to be dominated by waiting rather than working; set the timeout accordingly.
 
 ## Required status checks
 

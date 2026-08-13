@@ -26,7 +26,7 @@ can proceed in either order, or in parallel.
 
 | # | Milestone | Status |
 | --- | --- | --- |
-| I-1a | Design agreed, reference diagram, and the toolchain questions in [`floci.md`](floci.md) answered | In progress — design and diagram done; the EKS module question answered, three open |
+| I-1a | Design agreed, reference diagram, and the toolchain questions in [`floci.md`](floci.md) answered | **Done** — design and diagram done; all four questions answered, the last three by a verification spike applying against floci in CI |
 
 ### Track A — Terraform, the design verified
 
@@ -49,19 +49,29 @@ Taken first.
 ## What each milestone leaves behind
 
 **I-1a — the design.** The reference architecture written down and drawn, the emulator's real
-depth recorded honestly, and the two-track split decided with its costs. What remains is
-verification: whether inert-tier resources really apply, what the emulator returns on an
-unimplemented operation, and whether metadata-only mode is enough for the CI gate.
+depth recorded honestly, the two-track split decided with its costs, and the toolchain
+questions answered by measurement.
 
-The EKS module question is answered and off that list. It resolved by reading the module
-rather than by applying it, because it turned out to be a question about the module's own
-defaults: add-ons and access entries — the blockers we expected — are off, while
-`encryption_config` and IRSA are on and are what actually reach unsupported ground. Both are
-one variable away from being closed, so what is left is not a compatibility problem but a
-design choice, now an open decision in [`open-questions.md`](open-questions.md).
+The EKS module question resolved by reading the module rather than by applying it, because it
+turned out to be a question about the module's own defaults: add-ons and access entries — the
+blockers we expected — are off, while `encryption_config` and IRSA are on and are what
+actually reach unsupported ground. Both are one variable away from being closed, so what is
+left is not a compatibility problem but a design choice, still open in
+[`open-questions.md`](open-questions.md).
 
-The other three are expected to come from CI rather than from reading documentation — a red
-job is a fast, reproducible answer, and the first apply settles all three at once.
+The other three came from CI, as planned, via a throwaway verification spike — and the
+answers are better and worse than expected. The inert tier really does apply: VPC, subnets,
+security group, ALB, Web ACL, EKS cluster and node group all land in state. EKS mock mode
+needs no Docker socket, so the gate can run unprivileged. Unimplemented operations fail
+loudly rather than faking success, in two distinct clean shapes, which is what makes an
+apply worth gating on.
+
+The worse half: **CloudFront cannot be applied at all** — floci accepts the create and
+returns an object that segfaults the AWS provider on read-back — and placement groups are
+refused outright. The first contradicts the design's own "apply the inert tier and label
+it" rule for the service that rule names, and is now an open question against I-1b. An ALB
+also takes a full minute to create, so the gate's duration will be dominated by waiting.
+Everything measured is in [`floci.md`](floci.md).
 
 **I-1b — the pipeline.** Terraform for the whole reference design, and the pipeline that
 exercises it end to end. The plan is saved with `-out` and published as an artifact, and the
@@ -90,8 +100,12 @@ is where the three app changes land, and where every figure worth measuring is m
 
 ## The standing rule
 
-**No real cloud resources, ever** — and no Terraform *for the reference design* until I-1a's
-questions are answered. Those answers come from an apply, and an apply needs Terraform, so
-the rule as first written made I-1b unreachable; the one exception is a throwaway
-verification spike whose only purpose is answering them. It lives under `spike/`, gates
-nothing, and goes when its answers are recorded.
+**No real cloud resources, ever.** That half is permanent.
+
+The other half — no Terraform until I-1a's questions are answered — is **discharged**: they
+are answered. It is recorded here only because escaping it taught something. As first
+written it made I-1b unreachable, since the answers came from an apply and an apply needs
+Terraform. The way out was to read the ban as covering Terraform *for the reference design*,
+leaving a throwaway verification spike as its one exception: minimal, under `spike/`, gating
+nothing, deleted once its answers are recorded. Any future rule of the same shape should say
+so up front.

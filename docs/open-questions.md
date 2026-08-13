@@ -57,28 +57,36 @@ kind of choice that is expensive to reverse once the whole design is expressed o
 **When:** before I-1b starts. It has a real alternative and a real cost either way, so it
 gets an ADR rather than a line in a document.
 
-### Do the three remaining verification questions in `floci.md` behave as expected?
+### What does the reference design do about CloudFront, which cannot be applied?
 
-Whether inert-tier resources really apply; what floci returns on an unimplemented operation;
-and whether metadata-only mode covers the CI gate.
+Raised by the verification spike, which found that floci accepts `CreateDistribution` and
+then returns an object incomplete enough to **segfault the AWS provider** reading it back.
+CloudFront is not inert-but-appliable; it cannot be applied at all. Measured, with the
+stack trace, in [`floci.md`](floci.md).
 
-**Why it matters:** the second decides whether a failure is a clean error Terraform can report
-or something that looks like success — and a misconfiguration that looks like success is the
-worst outcome available. It is also the only one of the three that reading a plan cannot
-catch.
+**Why it matters:** `CLAUDE.md` says inert resources are applied and labelled, and names
+CloudFront as an example. That instruction is now impossible to follow for the one service
+it names. CloudFront is also the front door of the reference design — the edge chain in
+[`infrastructure.md`](infrastructure.md) starts there — so leaving it out means the
+Terraform no longer matches the diagram, which is the thing "apply them and label them"
+exists to guarantee.
 
-**When:** answered by the verification spike in `spike/floci-verification/`, rather than by
-more reading — a red job is a faster and more reliable answer than the documentation has
-given so far. The spike splits into two Terraform roots on purpose: question 2 is a
-*deliberate* failure, and in one root it would abort the apply and take questions 1 and 3
-unanswered with it. Run it with `gh workflow run spike-floci.yml`; the run's summary page
-is the answer. Then move the answers into `floci.md` and delete the spike.
+**The options, none obviously right:**
 
-**Note on where this gets answered.** These need floci running, and pulling its image needs a
-container registry. Any environment with restricted egress — a sandboxed agent session, a
-locked-down runner — will resolve the manifest and then fail on the blob CDN, for Docker Hub
-and ECR Public alike. GitHub Actions has no such restriction, which is the other reason the
-answers come from CI.
+- **Omit it, and say so.** The Terraform stops at the ALB; the diagram keeps CloudFront
+  with a marker saying it is undeployable against the emulator. Honest, and it breaks the
+  Terraform-matches-diagram property the rule was written to protect.
+- **Keep it behind a `count = var.emulated ? 0 : 1`.** The resource stays in the
+  configuration, reads as part of the design, and applies against real AWS. Adds a
+  conditional the one-root-no-modules style has so far avoided, and a variable whose only
+  purpose is to describe the emulator's shortcomings.
+- **Pin an older AWS provider.** The crash is in v6.59.0's `resourceDistributionFlatten`;
+  an earlier version might tolerate the partial response. Unverified, and pinning the
+  whole configuration to an old provider to accommodate one resource is a large tail to
+  wag a small dog.
+
+**When:** before I-1b writes the edge layer. It is a design question rather than a
+technical one — the technical answer is already known and is "no".
 
 ### Does the state bucket bootstrap cleanly?
 

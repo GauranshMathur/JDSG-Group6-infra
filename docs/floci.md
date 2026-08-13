@@ -208,34 +208,100 @@ all in CI.
 **Can't:** route a packet through a load balancer; enforce a security group; scale nodes
 through EKS node-group APIs; fail over a Multi-AZ RDS; apply a Network Firewall; exercise
 real IAM edge cases, quotas, or throttling; prove anything about actual AWS behaviour under
-load or failure.
+load or failure. **Nor apply a CloudFront distribution or an EC2 placement group at all** —
+measured, not assumed; see the verification section below.
 
 This is why [ADR 0001](adr/0001-terraform-verifies-runtime-deploys.md) splits the work:
 floci verifies that the Terraform stands up, and a real local Kubernetes cluster runs the
 app. Load and latency figures measured against the emulator would describe the emulator.
 
-## To verify in I-1a — things the docs left unclear
+## Verified in I-1a — measured, not read
 
-Narrowed by ADR 0001. The items about running the app on emulated services are gone, since
-the app no longer runs there; what remains is about the Terraform track. **Question 1 —
-whether the community EKS module applies cleanly — is answered above**, and answered
-without the emulator, because it turned out to be a question about the module rather than
-about floci. Three remain, and all three need floci actually running:
+The four questions this section used to hold are answered. The first — whether the
+community EKS module applies — was answered by reading the module. The other three needed
+floci actually running, and were answered by a throwaway verification spike applying
+Terraform against floci 1.6.0 in CI
+([run 31680455895](https://github.com/GauranshMathur/JDSG-Group6-infra/actions/runs/31680455895),
+config at commit `8cc69a9`, since deleted). What follows is what that apply did, rather
+than what the documentation implied it would do.
 
-1. Does an inert-tier resource — an `aws_lb`, a `aws_cloudfront_distribution`, a
-   `aws_wafv2_web_acl` — actually apply, or does "supported" turn out shallower than the
-   service list claims? Managed node groups belong here too: `aws_eks_node_group` alongside
-   an `aws_launch_template` and an `aws_placement_group`.
-2. What does floci return when an apply reaches an unimplemented operation: a clean error
-   Terraform can report, or something that looks like success?
-3. Does `FLOCI_SERVICES_EKS_MOCK=true` cover enough for the CI gate, so the Terraform job
-   needs no Docker socket?
+**Run twice, deliberately** — the second attempt reproduced the first exactly: the same
+twelve resources in state, the same provider crash, the same 404. None of what follows is
+a one-off.
 
-All three are settled by one apply, which is why the roadmap expects them to come from the
-first CI run rather than from more reading. Question 2 is the one to be careful about: a
-misconfiguration that reports success is the worst outcome available, and it is the only
-one of the three that cannot be spotted by reading a plan.
+### 1. Do inert-tier resources apply? — Yes, with two exceptions
 
-Moot under ADR 0001, kept only as curiosities: whether Rails connects through the RDS auth
-proxy, whether Active Storage works against floci's S3, and how permissive the emulated IAM
-is. The app meets real PostgreSQL and real object storage on the other track.
+Applied cleanly and landed in state, in a single apply: `aws_vpc`, two `aws_subnet`,
+`aws_security_group`, two `aws_iam_role`, `aws_eks_cluster`, `aws_eks_node_group`,
+`aws_launch_template`, `aws_lb`, `aws_wafv2_web_acl`. The network skeleton, the load
+balancer and the Web ACL are all real state entries returning real-shaped identifiers —
+an ALB ARN, a `vpc-`, a `sg-`. The inert tier is genuinely appliable, which is what
+[`CLAUDE.md`](../CLAUDE.md)'s "apply them and label them" rule assumed.
+
+Two did not:
+
+- **`aws_placement_group` — cleanly refused.** `CreatePlacementGroup` returns HTTP 400,
+  `UnsupportedOperation: Operation CreatePlacementGroup is not supported.` EC2 is
+  enabled, but not every EC2 operation is; this is the "an enabled service is not a
+  complete service" rule from the section above, caught in the act. Nothing in the
+  reference design needs one, so the answer is simply: don't.
+
+- **`aws_cloudfront_distribution` — crashed the AWS provider.** This is the finding worth
+  the whole spike. floci *accepts* `CreateDistribution` — no 404, no error — and then
+  returns an object incomplete enough that the provider segfaults reading it back:
+  `panic: runtime error: invalid memory address or nil pointer dereference` in
+  `cloudfront.resourceDistributionFlatten`, provider v6.59.0. The apply dies with
+  `Error: The terraform-provider-aws plugin crashed!`
+
+  So CloudFront is not inert-but-appliable; it is **not appliable at all** by this
+  provider. That contradicts what `CLAUDE.md` and the design both assume, and it is a
+  constraint on I-1b rather than a bug to fix here — recorded as an open question.
+
+### 2. What happens on an unimplemented operation? — It fails cleanly, in two ways
+
+The good answer, and the one that makes `terraform apply` worth using as a CI gate. Two
+distinct clean failures were observed:
+
+| What | Response | Meaning |
+| --- | --- | --- |
+| A service floci does not implement at all (Global Accelerator) | HTTP 404, `UnknownOperationException: Unknown operation: GlobalAccelerator_V20180706.CreateAccelerator` | The service is absent |
+| An implemented service, unimplemented operation (`CreatePlacementGroup`) | HTTP 400, `UnsupportedOperation` | The service is present but shallower than its name |
+
+Both surface through Terraform as ordinary resource errors naming the file and line. **No
+silent success was observed** — the outcome the roadmap called the worst available did not
+happen.
+
+But the CloudFront crash is a third failure mode nobody predicted, and it sits between the
+two: not a clean refusal, not a fake success, but an accepted call whose *response* is
+malformed. It still fails loudly, so an apply that goes green still means something — the
+reason is "floci's errors are loud", not "floci errors cleanly on everything it cannot do".
+
+### 3. Does EKS mock mode remove the need for a Docker socket? — Yes
+
+`FLOCI_SERVICES_EKS_MOCK=true`, floci running as a GitHub Actions service container, which
+gets **no Docker socket**. Both `aws_eks_cluster` and `aws_eks_node_group` created in under
+a second. The Terraform gate needs no privileged access to the runner's Docker daemon.
+
+Note what this buys and what it does not: mock mode returns the EKS *API* without launching
+k3s, so it verifies the Terraform and gives no Kubernetes to talk to. That is exactly the
+division [ADR 0001](adr/0001-terraform-verifies-runtime-deploys.md) drew, now confirmed
+rather than assumed.
+
+### Also learned, unprompted
+
+**An ALB takes 60 seconds to create.** `aws_lb` reported "Still creating…" for a full
+minute before returning — the provider waiting for a state transition the emulator appears
+never to make, until something times out into success. The reference design has two load
+balancers, so budget roughly two minutes of apply time for them alone, and expect the CI
+gate's duration to be dominated by waits rather than work.
+
+**floci 1.6.0's enabled-service list**, read straight from its startup log, includes
+`ec2, eks, elbv2, cloudfront, wafv2, iam, s3, rds, ecr, ssm, secretsmanager, kms, route53,
+elasticache, ecs, lambda, dynamodb, acm, cognito, autoscaling, cloudformation` — and does
+**not** include Global Accelerator, which is why it was a valid probe.
+
+### Moot under ADR 0001
+
+Kept only as curiosities: whether Rails connects through the RDS auth proxy, whether Active
+Storage works against floci's S3, and how permissive the emulated IAM is. The app meets real
+PostgreSQL and real object storage on the other track.
