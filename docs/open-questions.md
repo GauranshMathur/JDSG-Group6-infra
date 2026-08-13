@@ -71,22 +71,45 @@ it names. CloudFront is also the front door of the reference design — the edge
 Terraform no longer matches the diagram, which is the thing "apply them and label them"
 exists to guarantee.
 
-**The options, none obviously right:**
+**It is narrower than "CloudFront cannot exist in the Terraform", though.** The spike's
+plan output included `aws_cloudfront_distribution` in all thirteen resources: **`fmt`,
+`validate` and `plan` all handle it fine, and only `apply` crashes.** So the resource can
+stay in the configuration and appear, fully specified, in the plan artifact this
+pipeline already publishes (I-2.5). What is unreachable is *state*, and a CloudFront
+entry in the state of an emulator that does not serve traffic was never worth much. The
+question is really "how does `apply` stay green while the design keeps its front door".
+
+**The options:**
 
 - **Omit it, and say so.** The Terraform stops at the ALB; the diagram keeps CloudFront
   with a marker saying it is undeployable against the emulator. Honest, and it breaks the
   Terraform-matches-diagram property the rule was written to protect.
 - **Keep it behind a `count = var.emulated ? 0 : 1`.** The resource stays in the
-  configuration, reads as part of the design, and applies against real AWS. Adds a
+  configuration and reads as part of the design, and applies against real AWS. Costs a
   conditional the one-root-no-modules style has so far avoided, and a variable whose only
-  purpose is to describe the emulator's shortcomings.
+  purpose is to describe the emulator's shortcomings. Note it also removes the resource
+  from the *plan* when emulated, which is the visibility the point above was buying — so
+  pair it with a documentation-only `plan` at `emulated = false` if the published plan is
+  meant to show the whole design. That is a second plan that is never applied, which cuts
+  against [`ci-cd.md`](ci-cd.md)'s "apply the plan you published" rule and so must be
+  labelled unmistakably, or it becomes the exact confusion that rule prevents.
 - **Pin an older AWS provider.** The crash is in v6.59.0's `resourceDistributionFlatten`;
-  an earlier version might tolerate the partial response. Unverified, and pinning the
-  whole configuration to an old provider to accommodate one resource is a large tail to
-  wag a small dog.
+  an earlier version might tolerate the partial response. **Unverified, and worth one CI
+  run before any of the above is chosen** — if an older provider applies cleanly, the
+  question disappears entirely. The cost if it works: the whole configuration is pinned
+  to an old provider to accommodate one resource, which is a large tail wagging a small
+  dog, and it is a decision that has to be revisited at every provider upgrade.
+- **Report it upstream.** floci is MIT-licensed and the response is genuinely incomplete;
+  the provider crashing on it is arguably also a provider bug. Fixes nothing this
+  milestone, and is the only option that stops the next person hitting it.
 
-**When:** before I-1b writes the edge layer. It is a design question rather than a
-technical one — the technical answer is already known and is "no".
+**What does not work, checked rather than assumed:** there is no `-exclude` flag to drop a
+single resource from an apply — it does not exist in Terraform 1.13 or 1.15, only
+`-target`, and targeting everything-but-one is precisely the usage Terraform warns is for
+exceptional recovery, not pipelines.
+
+**When:** before I-1b writes the edge layer. Try the provider pin first, since it is one
+CI run and could make the rest moot.
 
 ### Does the state bucket bootstrap cleanly?
 
