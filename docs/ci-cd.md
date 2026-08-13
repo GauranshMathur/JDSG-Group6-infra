@@ -103,6 +103,23 @@ This is the one workflow that pushes to `main` directly rather than going throug
 request. That is deliberate: the SVG is derived output, not authored work. Reviewing it would
 mean reviewing a rendering.
 
+## `spike-floci.yml` — temporary
+
+The verification spike, and it leaves with the spike. It runs floci as a service container
+and applies `spike/floci-verification/` against it, answering the three questions left open
+in [`floci.md`](floci.md); the run's job summary is written to be the answer rather than
+something to be reconstructed from a log.
+
+Two things about its shape are deliberate. **A service container gets no Docker socket**,
+which is not a limitation being worked around — it is question 3, so the constraint is the
+experiment. And **the "unsupported" step is expected to fail**, so the job tolerates it and
+reports the exit status instead: a clean failure is the good answer, and a success would
+mean floci answers unimplemented operations with something shaped like success, which is
+what would make `terraform apply` worthless as a gate.
+
+It is `workflow_dispatch` plus pull requests touching `spike/**`, and **never a required
+check**. A throwaway probe that gates merges is a throwaway probe nobody dares delete.
+
 ## Required status checks
 
 `main` has none yet, so nothing gates a merge and auto-merge cannot arm. That is deliberate for

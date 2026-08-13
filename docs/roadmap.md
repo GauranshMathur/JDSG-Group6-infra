@@ -90,4 +90,8 @@ is where the three app changes land, and where every figure worth measuring is m
 
 ## The standing rule
 
-**No real cloud resources, ever** — and no Terraform until I-1a's questions are answered.
+**No real cloud resources, ever** — and no Terraform *for the reference design* until I-1a's
+questions are answered. Those answers come from an apply, and an apply needs Terraform, so
+the rule as first written made I-1b unreachable; the one exception is a throwaway
+verification spike whose only purpose is answering them. It lives under `spike/`, gates
+nothing, and goes when its answers are recorded.

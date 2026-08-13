@@ -128,7 +128,11 @@ can drift; keep manifests cluster-agnostic.
 ## Things to leave alone
 
 - **Never create real cloud resources.** The deployment is local by design.
-- Do not write Terraform until I-1a's toolchain questions in `docs/floci.md` are answered.
+- Do not write Terraform **for the reference design** until I-1a's toolchain questions in
+  `docs/floci.md` are answered. The exception, and the only one, is a throwaway verification
+  spike whose purpose is answering them — those questions are settled by an apply, and an
+  apply needs Terraform, so the rule as first written made I-1b unreachable. A spike is
+  minimal, lives under `spike/`, gates nothing, and is deleted once its answers are recorded.
 - Do not add application code here. It belongs in the app repository.
 - Do not weaken a CI security gate to make a build pass. If a finding is genuinely not
   actionable, say so and ask.

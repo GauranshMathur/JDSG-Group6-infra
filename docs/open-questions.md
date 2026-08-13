@@ -67,9 +67,12 @@ or something that looks like success — and a misconfiguration that looks like 
 worst outcome available. It is also the only one of the three that reading a plan cannot
 catch.
 
-**When:** answered by the first CI run of I-1b, rather than by more reading. A red job is a
-faster and more reliable answer than the documentation has given so far. All three settle on
-one apply.
+**When:** answered by the verification spike in `spike/floci-verification/`, rather than by
+more reading — a red job is a faster and more reliable answer than the documentation has
+given so far. The spike splits into two Terraform roots on purpose: question 2 is a
+*deliberate* failure, and in one root it would abort the apply and take questions 1 and 3
+unanswered with it. Run it with `gh workflow run spike-floci.yml`; the run's summary page
+is the answer. Then move the answers into `floci.md` and delete the spike.
 
 **Note on where this gets answered.** These need floci running, and pulling its image needs a
 container registry. Any environment with restricted egress — a sandboxed agent session, a
@@ -135,23 +138,6 @@ k6 and Toxiproxy are the leading candidates, deliberately undecided.
 ---
 
 ## Delivery
-
-### What answers the three remaining questions, given no Terraform may be written yet?
-
-`CLAUDE.md` says no Terraform until I-1a's questions are answered. The roadmap and the entry
-above say those answers come from the first CI apply. An apply needs Terraform, so as written
-the two rules cannot both be satisfied and I-1b cannot start.
-
-The obvious way out is a **verification spike**: a deliberately minimal, throwaway config —
-one inert-tier resource of each kind, plus one deliberately unsupported operation to force the
-question-2 case — and a CI job that applies it against floci. It is not the reference design,
-it answers all three at once, and it gets deleted afterwards.
-
-**Why it matters:** it is the only thing standing between here and I-1b, and it is a rule
-conflict rather than a technical problem, so it will not resolve itself.
-
-**When:** now. Whichever way it goes, one of the two rules needs rewording so the next person
-does not hit the same wall.
 
 ### Required status checks
 

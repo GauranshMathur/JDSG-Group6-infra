@@ -1,0 +1,168 @@
+name: Spike — floci verification
+
+# Answers the three questions left open in docs/floci.md, and is deleted with
+# the spike once they are answered. See spike/floci-verification/README.md.
+#
+# Never a required check. A throwaway probe that gates merges is a throwaway
+# probe nobody dares delete.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "spike/**"
+      - ".github/workflows/spike-floci.yml"
+
+concurrency:
+  group: spike-floci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Apply against floci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # A service container gets no Docker socket, which is not a limitation
+    # here — it is question 3. If the EKS resources apply anyway, the real
+    # Terraform gate does not need the socket either.
+    services:
+      floci:
+        image: floci/floci:latest
+        ports:
+          - 4566:4566
+        env:
+          FLOCI_SERVICES_EKS_MOCK: "true"
+          FLOCI_STORAGE_MODE: memory
+
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.1
+          terraform_wrapper: false
+
+      - name: Wait for floci to answer
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 60); do
+            if curl -fsS --max-time 5 http://localhost:4566/_floci/health >/dev/null 2>&1 \
+              || curl -fsS --max-time 5 http://localhost:4566/ >/dev/null 2>&1; then
+              echo "floci is answering on :4566"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::floci never answered on :4566 — the run can answer nothing."
+          exit 1
+
+      # --- Question 1 and 3 ------------------------------------------------
+      #
+      # Failure here is a real answer ("supported is shallower than the
+      # service list claims"), so the step records it rather than only
+      # aborting. `continue-on-error` keeps the reporting step reachable.
+      - name: Apply the inert-tier resources
+        id: inert
+        continue-on-error: true
+        working-directory: spike/floci-verification/inert
+        run: |
+          set -euo pipefail
+          terraform init -no-color
+          terraform validate -no-color
+          terraform apply -auto-approve -no-color 2>&1 | tee apply.log
+
+      - name: Record what applied
+        if: always()
+        working-directory: spike/floci-verification/inert
+        run: |
+          set -euo pipefail
+          if [ -f terraform.tfstate ]; then
+            echo "Resources in state:"
+            terraform state list -no-color || true
+            echo
+            echo "Outputs:"
+            terraform output -no-color || true
+          else
+            echo "No state file — the apply did not get far enough to create one."
+          fi
+
+      # --- Question 2 ------------------------------------------------------
+      #
+      # This one is EXPECTED to fail, and the interesting part is how. A
+      # non-zero exit with a legible provider error is the good outcome; a
+      # zero exit means floci answered an unimplemented operation with
+      # something shaped like success, which is the outcome that makes
+      # `terraform apply` untrustworthy as a gate.
+      - name: Probe an unimplemented operation
+        id: unsupported
+        continue-on-error: true
+        working-directory: spike/floci-verification/unsupported
+        run: |
+          set -euo pipefail
+          terraform init -no-color
+
+          set +e
+          terraform apply -auto-approve -no-color > apply.log 2>&1
+          status=$?
+          set -e
+
+          echo "exit_status=$status" >> "$GITHUB_OUTPUT"
+          cat apply.log
+
+          if [ "$status" -eq 0 ]; then
+            echo "::warning::floci reported SUCCESS for an operation expected to be unimplemented. Either it is implemented, or it fakes success — read the log before trusting any apply as a gate."
+          else
+            echo "The probe failed, which is the good outcome. Exit status: $status"
+          fi
+
+      # --- The answers -----------------------------------------------------
+      - name: Report
+        if: always()
+        run: |
+          set -euo pipefail
+          inert='${{ steps.inert.outcome }}'
+          probe_status='${{ steps.unsupported.outputs.exit_status }}'
+
+          {
+            echo "# floci verification spike"
+            echo
+            echo "| # | Question | Answer |"
+            echo "| --- | --- | --- |"
+
+            if [ "$inert" = "success" ]; then
+              echo "| 1 | Do inert-tier resources apply? | **Yes** — ALB, CloudFront, WAF, EKS cluster and node group, launch template and placement group all accepted |"
+              echo "| 3 | Does EKS mock mode remove the need for a Docker socket? | **Yes** — applied in a service container, which has no socket |"
+            else
+              echo "| 1 | Do inert-tier resources apply? | **No, or not all** — see the apply log in the step above |"
+              echo "| 3 | Does EKS mock mode remove the need for a Docker socket? | **Unanswered** — the apply did not reach the EKS resources |"
+            fi
+
+            case "$probe_status" in
+              0)  echo "| 2 | What happens on an unimplemented operation? | **It reported success.** Either the service is implemented after all, or floci fakes it — read the log. This is the outcome that would make an apply untrustworthy as a gate |" ;;
+              "") echo "| 2 | What happens on an unimplemented operation? | **Unanswered** — the probe step did not run to completion |" ;;
+              *)  echo "| 2 | What happens on an unimplemented operation? | **It failed cleanly**, exit status \`$probe_status\` — Terraform can report it, so an apply that succeeds means something |" ;;
+            esac
+
+            echo
+            echo "Identifiers mean the API accepted a resource, not that it does anything."
+            echo "Move these answers into \`docs/floci.md\` and delete the spike."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The job's own verdict: questions 1 and 3 must be answered for the run
+      # to have been worth anything. Question 2's probe is allowed to fail —
+      # that is what it is for.
+      - name: Fail if the inert apply did not answer
+        if: steps.inert.outcome != 'success'
+        run: |
+          echo "::error::The inert apply failed, so questions 1 and 3 are unanswered."
+          exit 1
