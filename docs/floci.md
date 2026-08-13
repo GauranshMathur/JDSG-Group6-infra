@@ -263,6 +263,26 @@ Two did not:
   plan artifact; what is unreachable is a state entry, on an emulator that would not have
   served traffic through it anyway.
 
+  **It is not a recent provider's bug.** A second throwaway spike applied one
+  distribution against floci across six AWS provider versions
+  ([run 31684334790](https://github.com/GauranshMathur/JDSG-Group6-infra/actions/runs/31684334790),
+  config at commit `fb47bbc`, since deleted):
+
+  | Provider | Result |
+  | --- | --- |
+  | `4.67.0` | crashed |
+  | `5.0.0` | crashed |
+  | `5.31.0` | crashed |
+  | `5.70.0` | crashed |
+  | `6.0.0` | crashed |
+  | `6.59.0` (control) | crashed |
+
+  Every version, identically, across two major releases and roughly three years of
+  provider history. Pinning backwards is not an escape, and the failure is better read
+  as "this response shape breaks the resource" than as a regression someone will fix.
+  What that leaves is the design options in
+  [`open-questions.md`](open-questions.md).
+
 ### 2. What happens on an unimplemented operation? — It fails cleanly, in two ways
 
 The good answer, and the one that makes `terraform apply` worth using as a CI gate. Two

@@ -93,12 +93,12 @@ question is really "how does `apply` stay green while the design keeps its front
   meant to show the whole design. That is a second plan that is never applied, which cuts
   against [`ci-cd.md`](ci-cd.md)'s "apply the plan you published" rule and so must be
   labelled unmistakably, or it becomes the exact confusion that rule prevents.
-- **Pin an older AWS provider.** The crash is in v6.59.0's `resourceDistributionFlatten`;
-  an earlier version might tolerate the partial response. **Unverified, and worth one CI
-  run before any of the above is chosen** — if an older provider applies cleanly, the
-  question disappears entirely. The cost if it works: the whole configuration is pinned
-  to an old provider to accommodate one resource, which is a large tail wagging a small
-  dog, and it is a decision that has to be revisited at every provider upgrade.
+- ~~**Pin an older AWS provider.**~~ **Eliminated by measurement.** A matrix applying one
+  distribution against floci on `4.67.0`, `5.0.0`, `5.31.0`, `5.70.0`, `6.0.0` and
+  `6.59.0` crashed on **every single version**, identically — the same nil pointer in the
+  CloudFront read-back, across two major versions and three years of releases. This is not
+  a regression in a recent provider; it is what the whole family does with a response
+  shaped like floci's. Recorded in [`floci.md`](floci.md).
 - **Report it upstream.** floci is MIT-licensed and the response is genuinely incomplete;
   the provider crashing on it is arguably also a provider bug. Fixes nothing this
   milestone, and is the only option that stops the next person hitting it.
@@ -108,8 +108,10 @@ single resource from an apply — it does not exist in Terraform 1.13 or 1.15, o
 `-target`, and targeting everything-but-one is precisely the usage Terraform warns is for
 exceptional recovery, not pipelines.
 
-**When:** before I-1b writes the edge layer. Try the provider pin first, since it is one
-CI run and could make the rest moot.
+**When:** before I-1b writes the edge layer. The cheap escape has been tried and does not
+exist, so this is now a choice between the three remaining options rather than a question
+with a possible technical answer. `count = var.emulated ? 0 : 1` is the least-bad of them
+unless the published plan's completeness matters more than the apply's.
 
 ### Does the state bucket bootstrap cleanly?
 

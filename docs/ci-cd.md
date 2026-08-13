@@ -103,9 +103,19 @@ This is the one workflow that pushes to `main` directly rather than going throug
 request. That is deliberate: the SVG is derived output, not authored work. Reviewing it would
 mean reviewing a rendering.
 
-## `spike-floci.yml` — existed, and is gone
+## The spike workflows — existed, and are gone
 
-Worth a paragraph because I-1b's Terraform job inherits two of its findings.
+Two of them: `spike-floci.yml` answered I-1a's three questions, and
+`spike-cloudfront-provider.yml` bisected six AWS provider versions to prove the CloudFront
+crash is not a recent regression. Both were deleted the moment their answers were
+recorded. Worth a paragraph because I-1b's Terraform job inherits their findings.
+
+**Neither could have been merged, and that is by design.** `security.yml` scans the whole
+repository (`scan-ref: .`) and fails on HIGH or CRITICAL, so throwaway Terraform — which is
+deliberately unencrypted and unrestricted — turns `Security` red. A spike therefore lives
+only on its pull request: open it, let CI run the experiment, read the answer, delete the
+spike in the same pull request, merge green. Quieting the scanner to merge one would be
+weakening a real gate for code that is about to be deleted.
 
 It ran floci as a service container and applied a throwaway config against it, answering
 the three questions in [`floci.md`](floci.md), and was deleted the moment those answers

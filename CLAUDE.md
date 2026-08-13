@@ -144,6 +144,14 @@ can drift; keep manifests cluster-agnostic.
   reference design*, never on a throwaway verification spike — those questions could only be
   settled by an apply, and an apply needs Terraform. Any future spike follows the same shape:
   minimal, under `spike/`, gating nothing, deleted once its answers are recorded.
+- **A spike is run on a pull request and deleted before that pull request merges.** Both
+  spikes so far learned this the same way: `security.yml`'s Trivy scan is `scan-ref: .`, the
+  whole repository, gating on HIGH and CRITICAL — so throwaway Terraform, which is
+  deliberately unencrypted and unrestricted, turns `Security` red and *cannot* be merged.
+  That is the gate working. The sequence is: open the pull request, let CI run the
+  experiment, read the answer, delete the spike in the same pull request, merge green.
+  **Never** add `skip-dirs`, narrow `scan-ref`, or otherwise quiet the scanner to get a
+  spike merged — the point of a spike is that it leaves.
 - Do not add application code here. It belongs in the app repository.
 - Do not weaken a CI security gate to make a build pass. If a finding is genuinely not
   actionable, say so and ask.
