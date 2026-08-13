@@ -57,62 +57,6 @@ kind of choice that is expensive to reverse once the whole design is expressed o
 **When:** before I-1b starts. It has a real alternative and a real cost either way, so it
 gets an ADR rather than a line in a document.
 
-### What does the reference design do about CloudFront, which cannot be applied?
-
-Raised by the verification spike, which found that floci accepts `CreateDistribution` and
-then returns an object incomplete enough to **segfault the AWS provider** reading it back.
-CloudFront is not inert-but-appliable; it cannot be applied at all. Measured, with the
-stack trace, in [`floci.md`](floci.md).
-
-**Why it matters:** `CLAUDE.md` says inert resources are applied and labelled, and names
-CloudFront as an example. That instruction is now impossible to follow for the one service
-it names. CloudFront is also the front door of the reference design — the edge chain in
-[`infrastructure.md`](infrastructure.md) starts there — so leaving it out means the
-Terraform no longer matches the diagram, which is the thing "apply them and label them"
-exists to guarantee.
-
-**It is narrower than "CloudFront cannot exist in the Terraform", though.** The spike's
-plan output included `aws_cloudfront_distribution` in all thirteen resources: **`fmt`,
-`validate` and `plan` all handle it fine, and only `apply` crashes.** So the resource can
-stay in the configuration and appear, fully specified, in the plan artifact this
-pipeline already publishes (I-2.5). What is unreachable is *state*, and a CloudFront
-entry in the state of an emulator that does not serve traffic was never worth much. The
-question is really "how does `apply` stay green while the design keeps its front door".
-
-**The options:**
-
-- **Omit it, and say so.** The Terraform stops at the ALB; the diagram keeps CloudFront
-  with a marker saying it is undeployable against the emulator. Honest, and it breaks the
-  Terraform-matches-diagram property the rule was written to protect.
-- **Keep it behind a `count = var.emulated ? 0 : 1`.** The resource stays in the
-  configuration and reads as part of the design, and applies against real AWS. Costs a
-  conditional the one-root-no-modules style has so far avoided, and a variable whose only
-  purpose is to describe the emulator's shortcomings. Note it also removes the resource
-  from the *plan* when emulated, which is the visibility the point above was buying — so
-  pair it with a documentation-only `plan` at `emulated = false` if the published plan is
-  meant to show the whole design. That is a second plan that is never applied, which cuts
-  against [`ci-cd.md`](ci-cd.md)'s "apply the plan you published" rule and so must be
-  labelled unmistakably, or it becomes the exact confusion that rule prevents.
-- ~~**Pin an older AWS provider.**~~ **Eliminated by measurement.** A matrix applying one
-  distribution against floci on `4.67.0`, `5.0.0`, `5.31.0`, `5.70.0`, `6.0.0` and
-  `6.59.0` crashed on **every single version**, identically — the same nil pointer in the
-  CloudFront read-back, across two major versions and three years of releases. This is not
-  a regression in a recent provider; it is what the whole family does with a response
-  shaped like floci's. Recorded in [`floci.md`](floci.md).
-- **Report it upstream.** floci is MIT-licensed and the response is genuinely incomplete;
-  the provider crashing on it is arguably also a provider bug. Fixes nothing this
-  milestone, and is the only option that stops the next person hitting it.
-
-**What does not work, checked rather than assumed:** there is no `-exclude` flag to drop a
-single resource from an apply — it does not exist in Terraform 1.13 or 1.15, only
-`-target`, and targeting everything-but-one is precisely the usage Terraform warns is for
-exceptional recovery, not pipelines.
-
-**When:** before I-1b writes the edge layer. The cheap escape has been tried and does not
-exist, so this is now a choice between the three remaining options rather than a question
-with a possible technical answer. `count = var.emulated ? 0 : 1` is the least-bad of them
-unless the published plan's completeness matters more than the apply's.
-
 ### Does the state bucket bootstrap cleanly?
 
 State goes in S3 on the emulator, but the bucket must exist before `terraform init` and

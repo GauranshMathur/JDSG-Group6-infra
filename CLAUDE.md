@@ -55,14 +55,14 @@ faking success.
 
 **Two findings constrain I-1b, and neither was predicted.** CloudFront **cannot be applied
 at all** — floci accepts the create and returns an object that segfaults the AWS provider
-on read-back — which makes the "apply the inert tier and label it" rule below impossible
-to follow for the one service it names by example. EC2 placement groups are refused
-outright. The CloudFront question is open in `docs/open-questions.md` and needs deciding
-before the edge layer is written.
+on read-back, on every provider version from 4.67 to 6.59. EC2 placement groups are
+refused outright. CloudFront is **decided**: omitted from the Terraform, with the reason
+stated wherever the design describes the edge
+([ADR 0002](docs/adr/0002-cloudfront-omitted-from-terraform.md)).
 
-**Two decisions are open before I-1b's Terraform is written**, both in
-`docs/open-questions.md`: what the design does about CloudFront, and whether the cluster
-is the community EKS module with floci-specific overrides or hand-rolled. The second is
+**One decision is still open before I-1b's Terraform is written**, in
+`docs/open-questions.md`: whether the cluster is the community EKS module with
+floci-specific overrides or hand-rolled. It is
 not a compatibility question — the module is two variables from applying
 (`encryption_config = null`, `enable_irsa = false`) — but a choice about whether to accept
 a cluster that no longer matches the reference design. It gets an ADR.
@@ -109,9 +109,15 @@ can drift; keep manifests cluster-agnostic.
   resources: the provider cannot plan against a cluster that does not exist yet, which forces
   two-phase applies.
 - **Inert resources are applied and labelled.** Most of the reference design creates cleanly
-  against floci and then does nothing — the whole network, both load balancers, CloudFront,
-  WAF. Apply them so the Terraform matches the diagram, and mark them so nobody reads a Web
-  ACL in the state file as something that filters traffic.
+  against floci and then does nothing — the whole network, both load balancers, WAF. Apply
+  them so the Terraform matches the diagram, and mark them so nobody reads a Web ACL in the
+  state file as something that filters traffic.
+- **CloudFront is the one exception, and it is not a matter of taste**
+  ([ADR 0002](docs/adr/0002-cloudfront-omitted-from-terraform.md)). floci accepts
+  `CreateDistribution` and returns an object that segfaults the AWS provider on read-back,
+  on every provider version from 4.67 to 6.59. It is omitted from the Terraform and the
+  omission is stated wherever the design describes the edge. Do not add it back expecting
+  it to work, and do not generalise the exception to anything else.
 - Never commit state. State lives in the emulator's S3.
 
 **Kubernetes**
