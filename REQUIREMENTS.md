@@ -18,7 +18,7 @@ Where a requirement here depends on the app, it says so and links.
 | I-1.2 | The design is drawn, using the official AWS icon set, and the drawing is the source of truth rather than a screenshot | Met — [`docs/diagrams/`](docs/diagrams/), draw.io XML rendered to SVG by CI |
 | I-1.3 | Every piece of the design says how it is realized locally, including the pieces that cannot be | Met — the tables in `infrastructure.md` and `floci.md` |
 | I-1.4 | The emulator's depth is recorded honestly: what does real work, what applies but is inert, what is absent | Met — the three tiers in [`docs/floci.md`](docs/floci.md) |
-| I-1.5 | The remaining toolchain questions are answered before Terraform is written | **Not met — three questions open in [`docs/floci.md`](docs/floci.md), down from four; the EKS module one is answered. This is the gate on I-2.x** |
+| I-1.5 | The remaining toolchain questions are answered before Terraform is written | **Met** — all four answered and recorded in [`docs/floci.md`](docs/floci.md). The EKS module question was answered by reading the module; the other three by a throwaway spike applying Terraform against floci in CI ([run 31680455895](https://github.com/GauranshMathur/JDSG-Group6-infra/actions/runs/31680455895)), since deleted. The inert tier applies, unimplemented operations fail loudly, and EKS mock mode needs no Docker socket — with two exceptions the run found: placement groups are refused, and CloudFront crashes the AWS provider. I-2.x is no longer gated on this |
 
 ## 2. Terraform — the design, verified
 

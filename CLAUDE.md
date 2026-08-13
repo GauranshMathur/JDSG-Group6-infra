@@ -46,16 +46,26 @@ Where things are written down:
 
 ## Current milestone
 
-**I-1a — design agreed, toolchain verification outstanding.** The design and the diagram
-exist. What remains are the three questions in `docs/floci.md`, all of which need floci
-actually running and are expected to be answered by the first CI apply.
+**I-1a is done; I-1b is next and unblocked.** The design and diagram exist, and all four
+toolchain questions are answered — the EKS module one by reading the module, the other
+three by a throwaway verification spike applying Terraform against floci in CI. What it
+measured is in `docs/floci.md`; the headlines are that the inert tier really does apply,
+EKS mock mode needs no Docker socket, and unimplemented operations fail loudly rather than
+faking success.
 
-The fourth — whether the community EKS module applies against the emulator — is answered,
-and answered by reading the module rather than applying it. It resolved into a design choice
-instead: the module is two variables from applying (`encryption_config = null`,
-`enable_irsa = false`), so the question is whether to accept a cluster that no longer matches
-the reference design, or hand-roll. That decision is open in `docs/open-questions.md` and
-gets an ADR before I-1b starts.
+**Two findings constrain I-1b, and neither was predicted.** CloudFront **cannot be applied
+at all** — floci accepts the create and returns an object that segfaults the AWS provider
+on read-back — which makes the "apply the inert tier and label it" rule below impossible
+to follow for the one service it names by example. EC2 placement groups are refused
+outright. The CloudFront question is open in `docs/open-questions.md` and needs deciding
+before the edge layer is written.
+
+**Two decisions are open before I-1b's Terraform is written**, both in
+`docs/open-questions.md`: what the design does about CloudFront, and whether the cluster
+is the community EKS module with floci-specific overrides or hand-rolled. The second is
+not a compatibility question — the module is two variables from applying
+(`encryption_config = null`, `enable_irsa = false`) — but a choice about whether to accept
+a cluster that no longer matches the reference design. It gets an ADR.
 
 **The work is two independent tracks — [ADR 0001](docs/adr/0001-terraform-verifies-runtime-deploys.md).**
 
@@ -128,7 +138,12 @@ can drift; keep manifests cluster-agnostic.
 ## Things to leave alone
 
 - **Never create real cloud resources.** The deployment is local by design.
-- Do not write Terraform until I-1a's toolchain questions in `docs/floci.md` are answered.
+- **I-1a's toolchain questions are answered**, so the rule that once blocked Terraform here
+  has been discharged. It is kept in shortened form because it was reworded to escape a
+  deadlock and the reasoning is worth not repeating: the ban was on Terraform *for the
+  reference design*, never on a throwaway verification spike — those questions could only be
+  settled by an apply, and an apply needs Terraform. Any future spike follows the same shape:
+  minimal, under `spike/`, gating nothing, deleted once its answers are recorded.
 - Do not add application code here. It belongs in the app repository.
 - Do not weaken a CI security gate to make a build pass. If a finding is genuinely not
   actionable, say so and ask.
