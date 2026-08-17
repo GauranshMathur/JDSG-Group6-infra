@@ -1,0 +1,164 @@
+name: Terraform
+
+# MANUAL ONLY. There is deliberately no `pull_request` or `push` trigger:
+# neither `plan` nor `apply` runs on its own. Applying infrastructure is
+# something a person decides to do, not something a merge does — see
+# docs/adr/0003-terraform-runs-on-demand.md.
+#
+# What still runs automatically is `fmt -check` and `validate`, in ci.yml,
+# because they need no emulator, create nothing, and are the checks worth
+# having on every change.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "plan (reads only) or apply (creates resources in the emulator)"
+        type: choice
+        options:
+          - plan
+          - apply
+        default: plan
+      confirm:
+        description: "Type APPLY to confirm. Required when action is apply, ignored otherwise."
+        type: string
+        default: ""
+
+concurrency:
+  # One at a time. Two applies against one emulator would race on state.
+  group: terraform
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TF_ROOT: infra/terraform
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  AWS_DEFAULT_REGION: us-east-1
+
+jobs:
+  terraform:
+    name: "terraform ${{ inputs.action }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # No Docker socket, which the I-1a spike proved is enough: EKS applies in
+    # mock mode, and every other service in the design is in-process anyway.
+    services:
+      floci:
+        image: floci/floci:latest
+        ports:
+          - 4566:4566
+        env:
+          FLOCI_SERVICES_EKS_MOCK: "true"
+          FLOCI_STORAGE_MODE: memory
+
+    steps:
+      # Checked before anything expensive starts, and before floci is asked to
+      # do anything, so a mistyped confirmation costs a few seconds.
+      - name: Refuse an unconfirmed apply
+        if: inputs.action == 'apply' && inputs.confirm != 'APPLY'
+        run: |
+          echo "::error::action=apply requires confirm=APPLY. Nothing has been run."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Check the Terraform root exists
+        run: |
+          set -euo pipefail
+          if [ ! -d "$TF_ROOT" ] || [ -z "$(find "$TF_ROOT" -maxdepth 1 -name '*.tf' -print -quit)" ]; then
+            echo "::error::No Terraform found in $TF_ROOT. It arrives with I-1b; this workflow is its pipeline, waiting."
+            exit 1
+          fi
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.1
+          terraform_wrapper: false
+
+      - name: Wait for floci to answer
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 60); do
+            if curl -fsS --max-time 5 http://localhost:4566/ >/dev/null 2>&1; then
+              echo "floci is answering on :4566"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::floci never answered on :4566."
+          exit 1
+
+      # The one ordering problem in the pipeline: state lives in the emulator's
+      # S3, and Terraform is what creates buckets — so the bucket has to exist
+      # before `init`. The emulator is fresh every run, so this runs every run.
+      # The name must match the `backend "s3"` block in the Terraform.
+      - name: Bootstrap the state bucket
+        run: |
+          set -euo pipefail
+          bucket="$(grep -rhoP '(?<=bucket\s{0,10}=\s{0,10}")[^"]+' "$TF_ROOT"/*.tf | head -1 || true)"
+          if [ -z "$bucket" ]; then
+            echo "::error::Could not read the state bucket name from the backend block in $TF_ROOT."
+            exit 1
+          fi
+          echo "Creating state bucket: $bucket"
+          aws --endpoint-url http://localhost:4566 s3api create-bucket --bucket "$bucket" 2>/dev/null \
+            || echo "Bucket already exists, continuing."
+
+      - name: Init
+        working-directory: ${{ env.TF_ROOT }}
+        run: terraform init -no-color
+
+      - name: Format check
+        working-directory: ${{ env.TF_ROOT }}
+        run: terraform fmt -check -recursive -no-color
+
+      - name: Validate
+        working-directory: ${{ env.TF_ROOT }}
+        run: terraform validate -no-color
+
+      # Always produced, for both actions. `apply` consumes this exact file
+      # rather than re-planning, so what runs is what was published.
+      - name: Plan
+        working-directory: ${{ env.TF_ROOT }}
+        run: terraform plan -out=tfplan -no-color
+
+      - name: Publish the plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ github.run_id }}
+          path: ${{ env.TF_ROOT }}/tfplan
+          retention-days: 14
+          if-no-files-found: error
+
+      # Plan and apply share a run because they must share an emulator: floci
+      # is ephemeral, so a plan from an earlier run describes state that no
+      # longer exists. Reviewing between the two therefore means running
+      # `plan`, reading the artifact, and then running `apply` — which
+      # re-plans against a clean emulator and applies that. Recorded in
+      # docs/adr/0003-terraform-runs-on-demand.md, because it is the one place
+      # this pipeline cannot give you plan-review-apply on a single artifact.
+      - name: Apply
+        if: inputs.action == 'apply'
+        working-directory: ${{ env.TF_ROOT }}
+        run: terraform apply -no-color tfplan
+
+      - name: Summary
+        if: always()
+        run: |
+          set -euo pipefail
+          {
+            echo "# terraform ${{ inputs.action }}"
+            echo
+            echo "- Emulator: floci, fresh this run, state discarded with it"
+            echo "- Plan artifact: \`tfplan-${{ github.run_id }}\`"
+            if [ "${{ inputs.action }}" = "apply" ]; then
+              echo "- Applied the plan produced in this run"
+            else
+              echo "- Nothing was applied"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

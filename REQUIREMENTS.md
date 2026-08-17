@@ -32,7 +32,7 @@ configuration stands up; never runs the app.
 | I-2.3 | `terraform fmt -check` passes, and CI fails on any drift | Planned |
 | I-2.4 | `terraform validate` passes | Planned |
 | I-2.5 | `terraform plan` is saved and published as a build artifact, and the apply applies *that* plan | Planned |
-| I-2.6 | `terraform apply` against a clean emulator succeeds, and is a CI gate | Planned |
+| I-2.6 | `terraform apply` against a clean emulator succeeds, run on demand | Planned — the pipeline exists (`.github/workflows/terraform.yml`) and waits for the Terraform. **Reworded from "and is a CI gate"**: `plan` and `apply` are `workflow_dispatch` only, and `apply` needs a typed confirmation ([ADR 0003](docs/adr/0003-terraform-runs-on-demand.md)). `fmt`/`validate` remain the automatic checks |
 | I-2.7 | State lives in S3 with locking, never on disk and never committed | Planned — S3 backend on the emulator; Terraform 1.10+ gives S3-native locking via `use_lockfile`, so no DynamoDB table |
 | I-2.8 | Resources that apply but do nothing are labelled as such, so nobody reads them as functional | Planned. The converse now needs labelling too: CloudFront is in the design and *not* in the Terraform ([ADR 0002](docs/adr/0002-cloudfront-omitted-from-terraform.md)), so the gap reads as a decision rather than an omission |
 | I-2.9 | Terraform describes AWS only; Kubernetes objects are manifests | Planned — ADR 0001 |

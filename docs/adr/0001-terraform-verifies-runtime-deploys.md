@@ -4,6 +4,13 @@
 **Date:** 2026-08-05
 **Milestone:** I-1a
 
+> **Amended in one consequence by [ADR 0003](0003-terraform-runs-on-demand.md).** The
+> decision below — Terraform verifies, a real cluster runs the app — stands unchanged. What
+> no longer holds is the claim, in the context and consequences, that verification is
+> therefore "run on every change": `plan` and `apply` are `workflow_dispatch` only. The
+> content here is left as written, because the reasoning that led to the expectation is the
+> part worth keeping.
+
 ## Context
 
 The reference design is an enterprise AWS architecture realized entirely locally, with
