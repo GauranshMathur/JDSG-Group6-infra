@@ -1,11 +1,12 @@
 # CI/CD
 
-GitHub Actions, in three workflows. All of them are small, because this repository holds one
+GitHub Actions, in four workflows. All of them are small, because this repository holds one
 kind of thing.
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
-| `ci.yml` | Pull requests | Workflow lint, Compose validation, misconfiguration scan. The Terraform pipeline lands here in I-1b |
+| `ci.yml` | Pull requests | Workflow lint, Compose validation, misconfiguration scan, Terraform `fmt` + `validate` |
+| `terraform.yml` | **Manual only** (`workflow_dispatch`) | Terraform `plan` and `apply` against floci, typed confirmation on apply — [ADR 0003](adr/0003-terraform-runs-on-demand.md) |
 | `security.yml` | Pull requests | Trivy filesystem scan — secrets, dependencies, misconfiguration |
 | `render-diagrams.yml` | Pushes to `main` touching a `.drawio` | Re-renders the architecture diagram to SVG |
 
@@ -45,10 +46,10 @@ anything else runs. Applying infrastructure is a thing a person decides to do, n
 merge does — harmless here, where the emulator is ephemeral and there is no AWS account, but
 this pipeline is written to be the shape a real one would take.
 
-The workflow exists and the Terraform does not, which is the one place this repository
-scaffolds ahead of its milestone. It is deliberate and it is safe: a `workflow_dispatch`-only
-workflow never fires on its own, so it gates nothing and costs nothing until someone runs it.
-It fails with a clear message if `infra/terraform/` holds no `.tf` files.
+The workflow briefly existed ahead of any Terraform — safe, because a
+`workflow_dispatch`-only workflow never fires on its own. Since the first I-1b slice
+landed in `infra/terraform/` it runs against real configuration; it still fails with a
+clear message if that directory is ever empty.
 
 ```
 (refuse unconfirmed apply)              → before anything else runs
@@ -60,9 +61,9 @@ terraform plan -out=tfplan              → uploaded as a build artifact
 terraform apply tfplan                  → only when action=apply
 ```
 
-**What stays automatic is `fmt -check` and `validate`**, which join `ci.yml` when the
-Terraform lands. They need no emulator, create nothing, and are the checks worth running on
-every change. What is lost by making the rest manual — that nothing now catches a
+**What stays automatic is `fmt -check` and `validate`**, as a `ci.yml` job on every pull
+request. They need no emulator (`init -backend=false` fetches provider schemas without
+touching state), create nothing, and are the checks worth running on every change. What is lost by making the rest manual — that nothing now catches a
 configuration which fails to plan — is recorded as the cost in ADR 0003 rather than glossed.
 
 Four things about that shape:

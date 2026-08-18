@@ -60,9 +60,9 @@ refused outright. CloudFront is **decided**: omitted from the Terraform, with th
 stated wherever the design describes the edge
 ([ADR 0002](docs/adr/0002-cloudfront-omitted-from-terraform.md)).
 
-**One decision is still open before I-1b's Terraform is written**, in
-`docs/open-questions.md`: whether the cluster is the community EKS module with
-floci-specific overrides or hand-rolled. It is
+**One decision is still open before the cluster's Terraform (`eks.tf`) is written**, in
+`docs/open-questions.md`: whether it is the community EKS module with
+floci-specific overrides or hand-rolled. I-1b's other slices do not depend on it. It is
 not a compatibility question — the module is two variables from applying
 (`encryption_config = null`, `enable_irsa = false`) — but a choice about whether to accept
 a cluster that no longer matches the reference design. It gets an ADR.

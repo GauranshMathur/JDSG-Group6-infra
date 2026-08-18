@@ -27,13 +27,13 @@ configuration stands up; never runs the app.
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| I-2.1 | The reference design exists as Terraform — VPC, EKS, RDS, S3, ECR, IAM, SSM and the edge chain | Planned — I-1b. **CloudFront is excluded by [ADR 0002](docs/adr/0002-cloudfront-omitted-from-terraform.md)**: it cannot be applied against the emulator on any provider version, so the Terraform's edge chain starts at the ALB. WAF, ACM and Route 53 are unaffected |
-| I-2.2 | One root, no modules, files split by concern | Planned |
-| I-2.3 | `terraform fmt -check` passes, and CI fails on any drift | Planned |
-| I-2.4 | `terraform validate` passes | Planned |
+| I-2.1 | The reference design exists as Terraform — VPC, EKS, RDS, S3, ECR, IAM, SSM and the edge chain | **In progress** — first slice merged: backend on the emulator's S3, provider, KMS key, media bucket. The rest lands slice by slice. **CloudFront is excluded by [ADR 0002](docs/adr/0002-cloudfront-omitted-from-terraform.md)**: it cannot be applied against the emulator on any provider version, so the Terraform's edge chain starts at the ALB. WAF, ACM and Route 53 are unaffected |
+| I-2.2 | One root, no modules, files split by concern | Holding — true of everything merged so far; re-checked as slices land |
+| I-2.3 | `terraform fmt -check` passes, and CI fails on any drift | Met — the `Terraform fmt and validate` job in `ci.yml`, on every pull request |
+| I-2.4 | `terraform validate` passes | Met — same job, via `init -backend=false` so it needs no emulator |
 | I-2.5 | `terraform plan` is saved and published as a build artifact, and the apply applies *that* plan | Planned |
-| I-2.6 | `terraform apply` against a clean emulator succeeds, run on demand | Planned — the pipeline exists (`.github/workflows/terraform.yml`) and waits for the Terraform. **Reworded from "and is a CI gate"**: `plan` and `apply` are `workflow_dispatch` only, and `apply` needs a typed confirmation ([ADR 0003](docs/adr/0003-terraform-runs-on-demand.md)). `fmt`/`validate` remain the automatic checks |
-| I-2.7 | State lives in S3 with locking, never on disk and never committed | Planned — S3 backend on the emulator; Terraform 1.10+ gives S3-native locking via `use_lockfile`, so no DynamoDB table |
+| I-2.6 | `terraform apply` against a clean emulator succeeds, run on demand | Planned — the pipeline and the first Terraform slice both exist; met by the first green on-demand apply. **Reworded from "and is a CI gate"**: `plan` and `apply` are `workflow_dispatch` only, and `apply` needs a typed confirmation ([ADR 0003](docs/adr/0003-terraform-runs-on-demand.md)). `fmt`/`validate` remain the automatic checks |
+| I-2.7 | State lives in S3 with locking, never on disk and never committed | Configured — `backend "s3"` on the emulator with `use_lockfile`, bucket bootstrapped by the workflow before init; proven by the first on-demand apply |
 | I-2.8 | Resources that apply but do nothing are labelled as such, so nobody reads them as functional | Planned. The converse now needs labelling too: CloudFront is in the design and *not* in the Terraform ([ADR 0002](docs/adr/0002-cloudfront-omitted-from-terraform.md)), so the gap reads as a decision rather than an omission |
 | I-2.9 | Terraform describes AWS only; Kubernetes objects are manifests | Planned — ADR 0001 |
 | I-2.10 | No real cloud resource is ever created | **Met, and permanent.** The provider points at the emulator; there is no AWS account |
