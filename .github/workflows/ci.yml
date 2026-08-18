@@ -2,7 +2,7 @@ name: CI
 
 # One workflow, one job, one check on the pull request. Steps run cheapest
 # first. Terraform checks are NOT here — they live in terraform.yml, path-
-# scoped, because they start an emulator (ADR 0004).
+# scoped, because they start an emulator.
 on:
   pull_request:
 
@@ -40,7 +40,8 @@ jobs:
       # or CRITICAL. ignore-unfixed keeps that achievable — a finding with
       # no upstream patch cannot be actioned by any change here. This scan
       # is also what makes throwaway spike Terraform unmergeable, which is
-      # deliberate (see docs/ci-cd.md).
+      # deliberate: a spike lives on its pull request and is deleted before
+      # it merges. Never quiet the scanner to get one in.
       - name: Security scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:

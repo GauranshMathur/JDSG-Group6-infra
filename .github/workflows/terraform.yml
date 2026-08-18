@@ -1,11 +1,9 @@
 name: Terraform
 
-# HashiCorp's "Automate Terraform with GitHub Actions" flow (ADR 0004), with
-# floci standing in for HCP Terraform: a pull request touching the Terraform
-# gets fmt → init → validate → plan, with the plan posted on the PR as a
-# comment; merging to main runs the same steps and applies. The emulator is
-# fresh every run, so every apply proves the config stands up from nothing.
-# There is no real AWS account anywhere in this.
+# The reference design applied against a fresh floci emulator. State is local
+# and thrown away with the runner, so the apply is free and side-effect-free —
+# a green check means this configuration stands up from nothing. There is no
+# real AWS account anywhere in this.
 on:
   pull_request:
     paths:
@@ -20,10 +18,8 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 env:
-  TF_ROOT: infra/terraform
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
   AWS_ACCESS_KEY_ID: test
@@ -36,7 +32,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    # No Docker socket: EKS applies in mock mode (measured in I-1a).
+    defaults:
+      run:
+        working-directory: infra/terraform
+
+    # No Docker socket here: EKS applies in mock mode.
     services:
       floci:
         image: floci/floci:latest
@@ -49,139 +49,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The wrapper (the default) captures each step's stdout, which is how
-      # the plan reaches the pull-request comment.
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.13.1
+          terraform_wrapper: false
 
-      # State lives in the emulator's S3 and Terraform is what creates
-      # buckets, so the bucket must exist before init — the pipeline's one
-      # ordering problem. The name is read from the backend block so the two
-      # cannot drift. (sed rather than a grep lookbehind: the runner's PCRE2
-      # rejects variable-length lookbehinds.)
-      - name: Bootstrap the state bucket
+      - name: Wait for floci
         run: |
           set -euo pipefail
           for _ in $(seq 1 30); do
-            curl -fsS --max-time 5 http://localhost:4566/ >/dev/null 2>&1 && break
+            curl -fsS --max-time 5 http://localhost:4566/ >/dev/null 2>&1 && exit 0
             sleep 2
           done
-          bucket="$(sed -nE 's/^[[:space:]]*bucket[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$TF_ROOT"/*.tf | head -n 1)"
-          if [ -z "$bucket" ]; then
-            echo "::error::No bucket name found in a backend block under $TF_ROOT."
-            exit 1
-          fi
-          aws --endpoint-url http://localhost:4566 s3api create-bucket --bucket "$bucket"
-
-      # fmt, validate and plan continue through failure so the comment can
-      # report every outcome; the job is failed explicitly below. init stays
-      # fatal — nothing after it works without it.
-      - name: Format check
-        id: fmt
-        working-directory: ${{ env.TF_ROOT }}
-        run: terraform fmt -check -recursive -no-color
-        continue-on-error: true
-
-      - name: Init
-        id: init
-        working-directory: ${{ env.TF_ROOT }}
-        run: terraform init -no-color
-
-      - name: Validate
-        id: validate
-        working-directory: ${{ env.TF_ROOT }}
-        run: terraform validate -no-color
-        continue-on-error: true
-
-      # -out, so the apply below applies this exact plan rather than
-      # re-planning: what was published is what runs (I-2.5).
-      - name: Plan
-        id: plan
-        working-directory: ${{ env.TF_ROOT }}
-        run: terraform plan -no-color -out=tfplan
-        continue-on-error: true
-
-      - name: Publish the plan
-        if: steps.plan.outcome == 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan-${{ github.run_id }}
-          path: ${{ env.TF_ROOT }}/tfplan
-          if-no-files-found: error
-
-      # One comment per pull request, updated in place — the tutorial's
-      # script, with values passed via env rather than interpolated into the
-      # source, which would be expression injection (actionlint flags the
-      # tutorial's own version for exactly that).
-      - name: Post the plan on the pull request
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        env:
-          FMT: ${{ steps.fmt.outcome }}
-          INIT: ${{ steps.init.outcome }}
-          VALIDATE: ${{ steps.validate.outcome }}
-          PLAN_OUTCOME: ${{ steps.plan.outcome }}
-          PLAN: ${{ steps.plan.outputs.stdout }}
-        with:
-          script: |
-            const marker = '<!-- terraform-plan-comment -->'
-            const raw = process.env.PLAN || '(no plan output)'
-            const plan = raw.length > 60000
-              ? raw.slice(0, 60000) + '\n... (truncated — the full output is in the workflow log)'
-              : raw
-            const body = [
-              marker,
-              '#### Terraform — against a clean floci emulator',
-              '',
-              '| Step | Outcome |',
-              '| --- | --- |',
-              `| \`fmt -check\` | ${process.env.FMT} |`,
-              `| \`init\` | ${process.env.INIT} |`,
-              `| \`validate\` | ${process.env.VALIDATE} |`,
-              `| \`plan\` | ${process.env.PLAN_OUTCOME} |`,
-              '',
-              '<details><summary>Show plan</summary>',
-              '',
-              '```terraform',
-              plan,
-              '```',
-              '',
-              '</details>',
-              '',
-              '*Merging this pull request applies — plan on pull request, apply on merge (ADR 0004).*',
-            ].join('\n')
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            })
-            const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes(marker))
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              })
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              })
-            }
-
-      - name: Fail if fmt, validate or plan failed
-        if: steps.fmt.outcome == 'failure' || steps.validate.outcome == 'failure' || steps.plan.outcome == 'failure'
-        run: |
-          echo "::error::fmt=${{ steps.fmt.outcome }} validate=${{ steps.validate.outcome }} plan=${{ steps.plan.outcome }}"
+          echo "::error::floci did not answer on :4566"
           exit 1
 
-      # Merge means apply (ADR 0004). The plan applied is the one this run
-      # produced — the PR's plan described a different emulator instance.
-      - name: Apply
-        if: github.event_name == 'push'
-        working-directory: ${{ env.TF_ROOT }}
-        run: terraform apply -no-color tfplan
+      - run: terraform fmt -check -recursive -no-color
+      - run: terraform init -no-color
+      - run: terraform validate -no-color
+      - run: terraform apply -auto-approve -no-color
