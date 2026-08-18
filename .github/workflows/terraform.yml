@@ -1,15 +1,11 @@
 name: Terraform
 
-# The standard flow (ADR 0004, superseding ADR 0003's manual-only shape):
-# every pull request that touches the Terraform gets fmt → validate → plan
-# against a fresh floci emulator, with the plan posted on the pull request
-# as a comment; merging to main runs the same steps and applies. A manual
-# dispatch runs the plan half only, for an on-demand check between changes.
-#
-# The emulator is ephemeral, so every apply proves the configuration stands
-# up from nothing. There is no real AWS account anywhere in this — the
-# provider points at floci, and pointing it anywhere else is out of scope
-# by the project premise.
+# HashiCorp's "Automate Terraform with GitHub Actions" flow (ADR 0004), with
+# floci standing in for HCP Terraform: a pull request touching the Terraform
+# gets fmt → init → validate → plan, with the plan posted on the PR as a
+# comment; merging to main runs the same steps and applies. The emulator is
+# fresh every run, so every apply proves the config stands up from nothing.
+# There is no real AWS account anywhere in this.
 on:
   pull_request:
     paths:
@@ -21,13 +17,6 @@ on:
     paths:
       - "infra/terraform/**"
       - ".github/workflows/terraform.yml"
-  workflow_dispatch:
-
-concurrency:
-  # One at a time per ref. Two applies against one emulator would race on
-  # state; runs on main queue rather than cancel, because each is an apply.
-  group: terraform-${{ github.ref }}
-  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -43,12 +32,11 @@ env:
 
 jobs:
   terraform:
-    name: "terraform ${{ github.event_name == 'push' && 'apply' || 'plan' }}"
+    name: Terraform
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    # No Docker socket, which the I-1a spike proved is enough: EKS applies in
-    # mock mode, and every other service in the design is in-process anyway.
+    # No Docker socket: EKS applies in mock mode (measured in I-1a).
     services:
       floci:
         image: floci/floci:latest
@@ -61,54 +49,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check the Terraform root exists
-        run: |
-          set -euo pipefail
-          if [ ! -d "$TF_ROOT" ] || [ -z "$(find "$TF_ROOT" -maxdepth 1 -name '*.tf' -print -quit)" ]; then
-            echo "::error::No Terraform found in $TF_ROOT."
-            exit 1
-          fi
-
-      # The wrapper is deliberately left on (the default): it captures each
-      # step's stdout so the plan can be posted on the pull request.
+      # The wrapper (the default) captures each step's stdout, which is how
+      # the plan reaches the pull-request comment.
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.13.1
 
-      - name: Wait for floci to answer
-        run: |
-          set -euo pipefail
-          for _ in $(seq 1 60); do
-            if curl -fsS --max-time 5 http://localhost:4566/ >/dev/null 2>&1; then
-              echo "floci is answering on :4566"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::floci never answered on :4566."
-          exit 1
-
-      # The one ordering problem in the pipeline: state lives in the emulator's
-      # S3, and Terraform is what creates buckets — so the bucket has to exist
-      # before `init`. The emulator is fresh every run, so this runs every run.
-      # The name must match the `backend "s3"` block in the Terraform.
+      # State lives in the emulator's S3 and Terraform is what creates
+      # buckets, so the bucket must exist before init — the pipeline's one
+      # ordering problem. The name is read from the backend block so the two
+      # cannot drift. (sed rather than a grep lookbehind: the runner's PCRE2
+      # rejects variable-length lookbehinds.)
       - name: Bootstrap the state bucket
         run: |
           set -euo pipefail
-          # sed rather than a grep lookbehind: the runner's PCRE2 rejects
-          # variable-length lookbehinds that newer local greps accept.
-          bucket="$(sed -nE 's/^[[:space:]]*bucket[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$TF_ROOT"/*.tf | head -n 1 || true)"
+          for _ in $(seq 1 30); do
+            curl -fsS --max-time 5 http://localhost:4566/ >/dev/null 2>&1 && break
+            sleep 2
+          done
+          bucket="$(sed -nE 's/^[[:space:]]*bucket[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$TF_ROOT"/*.tf | head -n 1)"
           if [ -z "$bucket" ]; then
-            echo "::error::Could not read the state bucket name from the backend block in $TF_ROOT."
+            echo "::error::No bucket name found in a backend block under $TF_ROOT."
             exit 1
           fi
-          echo "Creating state bucket: $bucket"
-          aws --endpoint-url http://localhost:4566 s3api create-bucket --bucket "$bucket" 2>/dev/null \
-            || echo "Bucket already exists, continuing."
+          aws --endpoint-url http://localhost:4566 s3api create-bucket --bucket "$bucket"
 
-      # fmt, validate and plan carry on through failure so the pull request
-      # comment can report every outcome; the job is failed explicitly
-      # afterwards. init stays fatal — nothing after it can work without it.
+      # fmt, validate and plan continue through failure so the comment can
+      # report every outcome; the job is failed explicitly below. init stays
+      # fatal — nothing after it works without it.
       - name: Format check
         id: fmt
         working-directory: ${{ env.TF_ROOT }}
@@ -126,8 +94,8 @@ jobs:
         run: terraform validate -no-color
         continue-on-error: true
 
-      # Always saved with -out: the apply below consumes this exact file
-      # rather than re-planning, so what was published is what runs.
+      # -out, so the apply below applies this exact plan rather than
+      # re-planning: what was published is what runs (I-2.5).
       - name: Plan
         id: plan
         working-directory: ${{ env.TF_ROOT }}
@@ -140,12 +108,12 @@ jobs:
         with:
           name: tfplan-${{ github.run_id }}
           path: ${{ env.TF_ROOT }}/tfplan
-          retention-days: 14
           if-no-files-found: error
 
-      # One comment per pull request, updated in place on every push — the
-      # shape from HashiCorp's "Automate Terraform with GitHub Actions"
-      # tutorial, minus HCP Terraform (see ADR 0004 for why not).
+      # One comment per pull request, updated in place — the tutorial's
+      # script, with values passed via env rather than interpolated into the
+      # source, which would be expression injection (actionlint flags the
+      # tutorial's own version for exactly that).
       - name: Post the plan on the pull request
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
@@ -205,32 +173,15 @@ jobs:
               })
             }
 
-      - name: Fail the job if a step failed
+      - name: Fail if fmt, validate or plan failed
         if: steps.fmt.outcome == 'failure' || steps.validate.outcome == 'failure' || steps.plan.outcome == 'failure'
         run: |
           echo "::error::fmt=${{ steps.fmt.outcome }} validate=${{ steps.validate.outcome }} plan=${{ steps.plan.outcome }}"
           exit 1
 
-      # Merge means apply. The plan applied is the one this run produced —
-      # the pull request's plan described a different emulator instance,
-      # a limitation the ephemeral emulator forces (ADR 0004).
+      # Merge means apply (ADR 0004). The plan applied is the one this run
+      # produced — the PR's plan described a different emulator instance.
       - name: Apply
         if: github.event_name == 'push'
         working-directory: ${{ env.TF_ROOT }}
         run: terraform apply -no-color tfplan
-
-      - name: Summary
-        if: always()
-        run: |
-          set -euo pipefail
-          {
-            echo "# terraform ${{ github.event_name == 'push' && 'apply' || 'plan' }}"
-            echo
-            echo "- Emulator: floci, fresh this run, state discarded with it"
-            echo "- Plan artifact: \`tfplan-${{ github.run_id }}\`"
-            if [ "${{ github.event_name }}" = "push" ]; then
-              echo "- Applied the plan produced in this run"
-            else
-              echo "- Nothing was applied"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"

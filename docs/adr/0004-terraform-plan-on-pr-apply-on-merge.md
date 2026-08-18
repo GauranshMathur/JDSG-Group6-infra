@@ -24,7 +24,10 @@ standard flow.
   place on every push — and published as an artifact.
 - **On a push to `main`** (i.e. a merge): the same steps, then `apply` of the plan file that
   run just produced.
-- **On manual dispatch:** the plan half only, for an on-demand check between changes.
+
+(A `workflow_dispatch` option for on-demand plans existed for a few hours between this ADR
+and the same-day slim-down to the tutorial's two triggers; dropped as a third trigger mode
+nothing needed.)
 
 The typed confirmation is gone with the manual shape: the pull request review is the human
 step, and merging is the confirmation. `fmt` and `validate` move out of `ci.yml` into this

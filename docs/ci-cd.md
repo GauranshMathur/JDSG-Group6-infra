@@ -1,52 +1,59 @@
 # CI/CD
 
-GitHub Actions, in four workflows. All of them are small, because this repository holds one
-kind of thing.
+GitHub Actions, in three workflows. A pull request shows **two checks at most**: `CI`,
+always, and `Terraform` when the change touches `infra/terraform/**`.
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
-| `ci.yml` | Pull requests | Workflow lint, Compose validation, misconfiguration scan |
-| `terraform.yml` | PRs touching the Terraform; pushes to `main`; manual `plan` | `fmt` → `validate` → `plan` against floci, plan posted on the PR; **apply on merge** — [ADR 0004](adr/0004-terraform-plan-on-pr-apply-on-merge.md) |
-| `security.yml` | Pull requests | Trivy filesystem scan — secrets, dependencies, misconfiguration |
+| `ci.yml` | Every pull request | One job — workflow lint, Compose validation, Trivy scan (secrets, dependencies, misconfiguration) |
+| `terraform.yml` | PRs touching the Terraform; pushes to `main` | `fmt` → `init` → `validate` → `plan`, plan posted on the PR; **apply on merge** — [ADR 0004](adr/0004-terraform-plan-on-pr-apply-on-merge.md) |
 | `render-diagrams.yml` | Pushes to `main` touching a `.drawio` | Re-renders the architecture diagram to SVG |
+
+It was briefly six checks, three of them Trivy in different costumes — a config scan in
+`ci.yml`, a gating filesystem scan in a separate `security.yml`, and the code-scanning
+check its SARIF upload created. One filesystem scan with `scanners: vuln,secret,misconfig`
+over the whole tree does everything the three did, so now there is one. **What that cost:**
+the SARIF report into GitHub's Security tab is gone — the scan still fails the build at the
+same severities with the same scanners, but findings are read in the job log rather than a
+tab. For a proof of concept, the gate is the part that matters.
 
 ## Why there is no routing
 
 The app repository briefly had a parent pipeline routing to child pipelines by changed path,
 because application and infrastructure code lived side by side and a Terraform change had no
-business running RSpec. Splitting the repositories removed the decision entirely: everything
-here is infrastructure, so one pipeline runs and nothing is ever skipped.
+business running RSpec. Splitting the repositories removed the decision entirely — everything
+here is infrastructure — and with it the router, the aggregate gate job, and the router's own
+test suite. Worth remembering as a general point: **a lot of pipeline complexity is a
+monorepo cost**, not an inherent one.
 
-That also removes the machinery the routing needed — a router, an aggregate gate job to avoid
-required-check deadlock, and a test suite for the router itself. Worth remembering as a
-general point: **a lot of pipeline complexity is a monorepo cost**, not an inherent one.
-
-The one path filter that does exist is `terraform.yml`'s: it starts an emulator, which a
-docs-only change has no business paying for. Everything in `ci.yml` and `security.yml`
-still runs on every pull request.
+The one path filter that exists is `terraform.yml`'s: it starts an emulator, which a
+docs-only change has no business paying for. `ci.yml` runs on every pull request,
+unconditionally.
 
 ## `ci.yml`
 
-**Workflow lint** runs [`actionlint`](https://github.com/rhysd/actionlint), which catches what
-a YAML parser cannot — expression injection, invalid `needs:` references, deprecated syntax —
-and runs shellcheck over every `run:` block, so the bash in these workflows is linted rather
-than read by eye. It earned its place in the app repository by finding an unquoted command
-substitution feeding a secret into a container, in code that had already been reviewed.
+One job, three steps, cheapest first:
 
-**Compose files** are validated with `docker compose config`, which resolves interpolation and
-merges and rejects unknown keys without starting anything.
-
-**Misconfiguration scan** runs Trivy's config scanner over `infra/`. It finds little today,
-because `infra/` holds two Compose files. It is here so that the first Terraform commit lands
-in front of a gate that already exists, rather than one added afterwards once something has
-already slipped through.
+- **[`actionlint`](https://github.com/rhysd/actionlint)** catches what a YAML parser cannot —
+  expression injection, invalid `needs:` references, deprecated syntax — and runs shellcheck
+  over every `run:` block. It earned its place in the app repository by finding an unquoted
+  command substitution feeding a secret into a container, in code that had already been
+  reviewed.
+- **`docker compose config`** validates the Compose files — interpolation, merges, unknown
+  keys — without starting anything.
+- **Trivy** scans the whole repository (`scan-ref: .`) for secrets, vulnerable dependencies
+  and misconfiguration, failing on any fixable HIGH or CRITICAL. `ignore-unfixed` keeps the
+  gate achievable: a finding with no upstream patch cannot be actioned by any change here,
+  and failing on it would teach everyone to ignore the gate. This is also the scan that
+  makes spike Terraform unmergeable — see below.
 
 ## `terraform.yml` — the Terraform pipeline
 
-**The standard flow** ([ADR 0004](adr/0004-terraform-plan-on-pr-apply-on-merge.md), the
-shape of HashiCorp's own
-[GitHub Actions tutorial](https://developer.hashicorp.com/terraform/tutorials/automation/github-actions)):
-a pull request that touches the Terraform is planned, and merging it applies.
+**The standard flow** ([ADR 0004](adr/0004-terraform-plan-on-pr-apply-on-merge.md)):
+HashiCorp's own
+[GitHub Actions tutorial](https://developer.hashicorp.com/terraform/tutorials/automation/github-actions),
+with floci standing in for HCP Terraform. A pull request that touches the Terraform is
+planned; merging it applies.
 
 ```
 On a pull request touching infra/terraform/** (or this workflow):
@@ -60,8 +67,6 @@ On a pull request touching infra/terraform/** (or this workflow):
 On a push to main touching the same paths (i.e. a merge):
   the same steps, then
   terraform apply tfplan                → the plan produced in this run
-
-On workflow_dispatch: the plan half only — an on-demand check.
 ```
 
 The PR comment is the review surface: one comment per pull request, updated in place on
@@ -70,53 +75,23 @@ every push, carrying each step's outcome and the full plan in a collapsible sect
 the job is failed explicitly afterwards.
 
 **Merging is the confirmation.** ADR 0003 briefly made all of this manual-only with a typed
-confirmation; ADR 0004 superseded it. What survives from that record is its analysis, and
-one production note: with a real account, the guard on the apply job is a GitHub
-Environment with required reviewers — a merge should not reach real infrastructure without
-one. Here nothing is real, so nothing gates it.
+confirmation; ADR 0004 superseded it. The production note that survives: with a real
+account, the guard on the apply job is a GitHub Environment with required reviewers. Here
+nothing is real, so nothing gates it.
 
-Three things about the shape:
+**Each run gets a fresh emulator, and that shapes everything else.** floci's state dies
+with its container, so the pull request's plan describes an emulator instance that no
+longer exists by the merge — the merge run plans again and applies the plan file *it*
+produced. Within a run, what was published is what runs; across runs, the two plans can
+only describe the same intent. And a fresh emulator is exactly the assertion being gated:
+*this configuration stands up from nothing.*
 
-**Plan and apply cannot share a file across runs, because each run gets a fresh emulator.**
-floci's state dies with its container, so the pull request's plan describes an emulator
-instance that no longer exists by the merge. The merge run therefore plans again and
-applies the plan file *it* produced — within the run, what was published is what runs;
-across runs, the two plans can only describe the same intent. ADR 0004 carries this
-forward from ADR 0003 without pretending otherwise.
-
-**floci runs as a service container, fresh every run.** That means every apply starts from
-nothing, which is exactly the assertion: *this configuration stands up against a clean
-emulator*. Persisting state between runs would be worse than useless — Terraform would refresh
-state describing resources that no longer exist and plan to recreate everything.
-
-**State still goes to S3, on the emulator.** Not for durability — the bucket dies with the
-container — but because it is the real pattern, and because the identical configuration then
-works against a persistent local floci, where state genuinely accumulates and incremental
-applies do what you want. Terraform 1.10+ gives S3-native locking with `use_lockfile`, so
-there is no DynamoDB lock table.
-
-One ordering problem, now handled: the state bucket must exist before `terraform init`, and
-Terraform is what creates buckets. The workflow bootstraps it with the AWS CLI before init,
-reading the bucket name out of the backend block so the two cannot drift, and failing loudly
-if it cannot find one.
-
-**GitHub has no managed state backend.** GitLab ships one — an HTTP backend with encryption,
-locking and versioning, authenticated against GitLab roles. GitHub has no equivalent, so S3 is
-not a second-best choice here; it is the choice, and it happens to be the one the reference
-design already calls for.
-
-## `security.yml`
-
-Separate from `ci.yml` so that it is obviously never conditional.
-
-It is also what makes the `Trivy` code-scanning check appear on every pull request. That check
-is created by the SARIF upload rather than being a job, so if the only upload lived in a
-conditional job, any pull request that skipped it would show the check as expected and waiting
-for a status that never arrives — which reads exactly like a job refusing to be scheduled.
-
-Each scan runs twice: once to gate, filtered to HIGH and CRITICAL with an exit code, and once
-to report every severity as SARIF into the Security tab. The reporting pass is `if: always()`,
-so a failing gate still publishes what it found.
+**State still goes to S3, on the emulator, with `use_lockfile`.** Not for durability — the
+bucket dies with the container — but because it is the real pattern, and the identical
+configuration then works unchanged against a persistent local floci, where state genuinely
+accumulates. The one ordering problem: the bucket must exist before `terraform init`, and
+Terraform is what creates buckets, so the workflow bootstraps it with the AWS CLI first,
+reading the name out of the backend block so the two cannot drift.
 
 ## `render-diagrams.yml`
 
@@ -139,35 +114,33 @@ mean reviewing a rendering.
 Two of them: `spike-floci.yml` answered I-1a's three questions, and
 `spike-cloudfront-provider.yml` bisected six AWS provider versions to prove the CloudFront
 crash is not a recent regression. Both were deleted the moment their answers were
-recorded. Worth a paragraph because I-1b's Terraform job inherits their findings.
+recorded. Worth a paragraph because the Terraform job inherits their findings.
 
-**Neither could have been merged, and that is by design.** `security.yml` scans the whole
-repository (`scan-ref: .`) and fails on HIGH or CRITICAL, so throwaway Terraform — which is
-deliberately unencrypted and unrestricted — turns `Security` red. A spike therefore lives
-only on its pull request: open it, let CI run the experiment, read the answer, delete the
-spike in the same pull request, merge green. Quieting the scanner to merge one would be
+**Neither could have been merged, and that is by design.** `ci.yml`'s Trivy scan covers the
+whole repository (`scan-ref: .`) and fails on HIGH or CRITICAL, so throwaway Terraform —
+which is deliberately unencrypted and unrestricted — turns `CI` red. A spike therefore
+lives only on its pull request: open it, let CI run the experiment, read the answer, delete
+the spike in the same pull request, merge green. Quieting the scanner to merge one would be
 weakening a real gate for code that is about to be deleted.
 
-It ran floci as a service container and applied a throwaway config against it, answering
-the three questions in [`floci.md`](floci.md), and was deleted the moment those answers
-were recorded — a throwaway probe that outlives its question becomes a workflow nobody
-dares touch. The
+The spike ran floci as a service container and applied a throwaway config against it,
+answering the three questions in [`floci.md`](floci.md). The
 [run](https://github.com/GauranshMathur/JDSG-Group6-infra/actions/runs/31680455895) is the
 evidence; the config is in this repository's history at `8cc69a9`.
 
-**What the Terraform job should keep from it.** A service container gets no Docker socket,
-and with `FLOCI_SERVICES_EKS_MOCK=true` the EKS resources applied anyway — so the gate
-needs no privileged access to the runner's daemon. And an `aws_lb` takes a full minute to
-create against the emulator, so with two load balancers in the design, expect the job's
-duration to be dominated by waiting rather than working; set the timeout accordingly.
+**What the Terraform job keeps from it.** A service container gets no Docker socket, and
+with `FLOCI_SERVICES_EKS_MOCK=true` the EKS resources applied anyway — so the gate needs no
+privileged access to the runner's daemon. And an `aws_lb` takes a full minute to create
+against the emulator, so with two load balancers in the design, expect the job's duration
+to be dominated by waiting rather than working; the timeout is set accordingly.
 
 ## Required status checks
 
 `main` has none yet, so nothing gates a merge and auto-merge cannot arm. That is deliberate
-for now. It changes with I-1c: the scans and the Terraform plan become required. The apply
-can never be among them — it runs *on* the merge, downstream of any gate — and requiring
-the plan needs care, because the Terraform workflow is path-scoped and GitHub shows a
-required check that never starts as pending forever.
+for now. It changes with I-1c: `CI` and the Terraform plan become required. The apply can
+never be among them — it runs *on* the merge, downstream of any gate — and requiring the
+plan needs care, because the Terraform workflow is path-scoped and GitHub shows a required
+check that never starts as pending forever.
 
 ## Versioning
 

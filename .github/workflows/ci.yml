@@ -1,83 +1,52 @@
 name: CI
 
-# One pipeline, because this repository holds one kind of thing. The app
-# repository's parent/child routing existed to decide between app and infra
-# work living side by side; splitting the repositories removed the decision.
+# One workflow, one job, one check on the pull request. Steps run cheapest
+# first. Terraform checks are NOT here — they live in terraform.yml, path-
+# scoped, because they start an emulator (ADR 0004).
 on:
   pull_request:
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  # Catches what a YAML parser cannot: expression injection, invalid `needs:`
-  # references, deprecated syntax. It also runs shellcheck over every `run:`
-  # block, so the bash in these workflows is linted rather than read by eye.
-  workflows:
-    name: Workflow lint
+  ci:
+    name: CI
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - name: actionlint
+      # Catches what a YAML parser cannot — expression injection, invalid
+      # `needs:` references — and shellchecks every `run:` block.
+      - name: Lint the workflows
         uses: raven-actions/actionlint@v2
         with:
           shellcheck: true
 
-  compose:
-    name: Compose files
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-
-      # `config` resolves and validates the file — interpolation, merges,
-      # unknown keys — without starting anything.
+      # `config` resolves interpolation and merges and rejects unknown keys
+      # without starting anything.
       - name: Validate the Compose files
         run: |
           set -euo pipefail
-          found=0
           for file in infra/docker/*.yml infra/docker/*.yaml; do
             [ -e "$file" ] || continue
-            found=1
             echo "Validating $file"
             docker compose -f "$file" config --quiet
           done
 
-          if [ "$found" -eq 0 ]; then
-            echo "::error::No Compose files found under infra/docker — this job expects at least one."
-            exit 1
-          fi
-
-          echo "All Compose files are valid."
-
-  # Terraform, Kubernetes manifests and Dockerfiles are all things Trivy's
-  # misconfiguration scanner understands. It finds nothing much today because
-  # `infra/` holds two Compose files; it is here so that the first Terraform
-  # commit is scanned by a gate that already exists rather than one added
-  # afterwards.
-  misconfig:
-    name: Misconfiguration scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Trivy configuration scan
+      # The one security gate: secrets, vulnerable dependencies and
+      # misconfiguration over the whole tree, failing on any fixable HIGH
+      # or CRITICAL. ignore-unfixed keeps that achievable — a finding with
+      # no upstream patch cannot be actioned by any change here. This scan
+      # is also what makes throwaway spike Terraform unmergeable, which is
+      # deliberate (see docs/ci-cd.md).
+      - name: Security scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          scan-type: config
-          scan-ref: infra
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
           exit-code: "1"
-
-  # Terraform checks are NOT here: fmt, validate and plan run in
-  # terraform.yml on every pull request that touches the Terraform, with
-  # the plan posted as a PR comment, and apply runs on merge (ADR 0004).
-  # That workflow is path-scoped because it starts an emulator, which a
-  # docs-only change has no business paying for.

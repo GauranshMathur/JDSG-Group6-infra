@@ -29,8 +29,8 @@ configuration stands up; never runs the app.
 | --- | --- | --- |
 | I-2.1 | The reference design exists as Terraform — VPC, EKS, RDS, S3, ECR, IAM, SSM and the edge chain | **In progress** — first slice merged: backend on the emulator's S3, provider, KMS key, media bucket. The rest lands slice by slice. **CloudFront is excluded by [ADR 0002](docs/adr/0002-cloudfront-omitted-from-terraform.md)**: it cannot be applied against the emulator on any provider version, so the Terraform's edge chain starts at the ALB. WAF, ACM and Route 53 are unaffected |
 | I-2.2 | One root, no modules, files split by concern | Holding — true of everything merged so far; re-checked as slices land |
-| I-2.3 | `terraform fmt -check` passes, and CI fails on any drift | Met — the `Terraform fmt and validate` job in `ci.yml`, on every pull request |
-| I-2.4 | `terraform validate` passes | Met — same job, via `init -backend=false` so it needs no emulator |
+| I-2.3 | `terraform fmt -check` passes, and CI fails on any drift | Met — the `Terraform` workflow, on every pull request that touches the Terraform (the only changes that can introduce drift) |
+| I-2.4 | `terraform validate` passes | Met — same workflow, after a real `init` against the emulator |
 | I-2.5 | `terraform plan` is saved and published as a build artifact, and the apply applies *that* plan | Met — every Terraform-touching pull request publishes its plan as an artifact and a PR comment, and the merge run applies the plan file it produced. Within a run the published plan is the applied plan; across runs it cannot be, because each run gets a fresh emulator ([ADR 0004](docs/adr/0004-terraform-plan-on-pr-apply-on-merge.md)) |
 | I-2.6 | `terraform apply` against a clean emulator succeeds, on every merge to `main` that touches the Terraform | Met — first green apply on `main`: [run 32094155478](https://github.com/GauranshMathur/JDSG-Group6-infra/actions/runs/32094155478), the merge of the flow itself. **Reworded twice**: "is a CI gate" became on-demand ([ADR 0003](docs/adr/0003-terraform-runs-on-demand.md)), then [ADR 0004](docs/adr/0004-terraform-plan-on-pr-apply-on-merge.md) superseded it with the standard flow — plan on pull request, apply on merge |
 | I-2.7 | State lives in S3 with locking, never on disk and never committed | Met — `backend "s3"` on the emulator with `use_lockfile`, bucket bootstrapped by the workflow before init; exercised by every plan and apply run since [32094155478](https://github.com/GauranshMathur/JDSG-Group6-infra/actions/runs/32094155478) |
@@ -69,8 +69,8 @@ Track B. Independent of track A and of the emulator.
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| I-5.1 | Committed secrets are scanned for on every pull request | Met — Trivy secret scanning |
-| I-5.2 | Terraform and Kubernetes manifests are scanned for misconfiguration; any fixable HIGH or CRITICAL fails the build | Met — Trivy config scan, already running against `infra/` |
+| I-5.1 | Committed secrets are scanned for on every pull request | Met — `ci.yml`'s Trivy scan, secrets among its scanners, on every pull request |
+| I-5.2 | Terraform and Kubernetes manifests are scanned for misconfiguration; any fixable HIGH or CRITICAL fails the build | Met — the same scan's `misconfig` scanner, over the whole repository |
 | I-5.3 | No credential, key or endpoint for a real cloud account exists in this repository | **Met, and permanent** |
 | I-5.4 | Terraform state is never committed | Planned — enforced by `.gitignore` and the S3 backend |
 
