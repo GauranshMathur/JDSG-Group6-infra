@@ -95,7 +95,9 @@ jobs:
       - name: Bootstrap the state bucket
         run: |
           set -euo pipefail
-          bucket="$(grep -rhoP '(?<=bucket\s{0,10}=\s{0,10}")[^"]+' "$TF_ROOT"/*.tf | head -1 || true)"
+          # sed rather than a grep lookbehind: the runner's PCRE2 rejects
+          # variable-length lookbehinds that newer local greps accept.
+          bucket="$(sed -nE 's/^[[:space:]]*bucket[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$TF_ROOT"/*.tf | head -n 1 || true)"
           if [ -z "$bucket" ]; then
             echo "::error::Could not read the state bucket name from the backend block in $TF_ROOT."
             exit 1
