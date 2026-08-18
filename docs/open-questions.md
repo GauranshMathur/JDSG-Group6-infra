@@ -54,8 +54,10 @@ achievable:
 **Why it matters:** it decides how every Terraform file in I-1b is written, and it is the
 kind of choice that is expensive to reverse once the whole design is expressed one way.
 
-**When:** before I-1b starts. It has a real alternative and a real cost either way, so it
-gets an ADR rather than a line in a document.
+**When:** before `eks.tf` is written. I-1b's first slice (backend, provider, S3, KMS)
+started without it, because nothing outside the cluster depends on the answer — the
+no-modules rule already covers everything else. It has a real alternative and a real cost
+either way, so it gets an ADR rather than a line in a document.
 
 ### Does the state bucket bootstrap cleanly?
 
