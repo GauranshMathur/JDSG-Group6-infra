@@ -33,4 +33,5 @@ The application's decision records, 0001 to 0007 in its own series, are in
 | --- | --- | --- |
 | [0001](0001-terraform-verifies-runtime-deploys.md) | Terraform is verified against the emulator; the app is deployed on a real local cluster | Accepted |
 | [0002](0002-cloudfront-omitted-from-terraform.md) | CloudFront is omitted from the Terraform, and the omission is labelled | Accepted |
-| [0003](0003-terraform-runs-on-demand.md) | `terraform plan` and `apply` run on demand, not on a trigger | Accepted |
+| [0003](0003-terraform-runs-on-demand.md) | `terraform plan` and `apply` run on demand, not on a trigger | Superseded by 0004 |
+| [0004](0004-terraform-plan-on-pr-apply-on-merge.md) | Terraform plan on pull request, apply on merge | Accepted |

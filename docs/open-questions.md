@@ -59,16 +59,6 @@ started without it, because nothing outside the cluster depends on the answer â€
 no-modules rule already covers everything else. It has a real alternative and a real cost
 either way, so it gets an ADR rather than a line in a document.
 
-### Does the state bucket bootstrap cleanly?
-
-State goes in S3 on the emulator, but the bucket must exist before `terraform init` and
-Terraform is what creates buckets.
-
-**Why it matters:** it is the one ordering problem in the pipeline, and getting it wrong makes
-the first run of every fresh emulator fail in a way that looks like a Terraform bug.
-
-**When:** I-1b, with the backend.
-
 ---
 
 ## Track B â€” Runtime

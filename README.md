@@ -75,7 +75,7 @@ being deep enough is the risk this split removes.
 ```
 JDSG-Group6-infra/
 ├── infra/
-│   ├── terraform/        # AWS resources (I-1b — in progress; run via the manual Terraform workflow)
+│   ├── terraform/        # AWS resources (I-1b — in progress; planned on every PR, applied on merge)
 │   ├── kubernetes/       # Manifests, cluster-agnostic (I-1d)
 │   └── docker/           # Compose files for local dev and the emulator
 ├── .github/
