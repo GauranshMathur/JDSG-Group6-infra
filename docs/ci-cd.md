@@ -36,20 +36,42 @@ because `infra/` holds two Compose files. It is here so that the first Terraform
 in front of a gate that already exists, rather than one added afterwards once something has
 already slipped through.
 
-## The Terraform pipeline — I-1b
+## `terraform.yml` — the Terraform pipeline
 
-Not yet written. Scaffolding it against no Terraform would be checking nothing, so it arrives
-with the Terraform itself:
+**Manual only, and that is the point** ([ADR 0003](adr/0003-terraform-runs-on-demand.md)).
+There is no `pull_request` or `push` trigger: `plan` and `apply` are `workflow_dispatch`,
+and `apply` additionally requires typing `APPLY` into a confirmation input, checked before
+anything else runs. Applying infrastructure is a thing a person decides to do, not a thing a
+merge does — harmless here, where the emulator is ephemeral and there is no AWS account, but
+this pipeline is written to be the shape a real one would take.
+
+The workflow exists and the Terraform does not, which is the one place this repository
+scaffolds ahead of its milestone. It is deliberate and it is safe: a `workflow_dispatch`-only
+workflow never fires on its own, so it gates nothing and costs nothing until someone runs it.
+It fails with a clear message if `infra/terraform/` holds no `.tf` files.
 
 ```
+(refuse unconfirmed apply)              → before anything else runs
+(bootstrap the state bucket)            → AWS CLI, before init
+terraform init                          # S3 backend on floci
 terraform fmt -check -recursive
-terraform init            # S3 backend on floci; bucket bootstrapped first
 terraform validate
-terraform plan -out=tfplan     → uploaded as a build artifact
-terraform apply tfplan         → applies what was planned, not a re-plan
+terraform plan -out=tfplan              → uploaded as a build artifact
+terraform apply tfplan                  → only when action=apply
 ```
 
-Three things about that shape:
+**What stays automatic is `fmt -check` and `validate`**, which join `ci.yml` when the
+Terraform lands. They need no emulator, create nothing, and are the checks worth running on
+every change. What is lost by making the rest manual — that nothing now catches a
+configuration which fails to plan — is recorded as the cost in ADR 0003 rather than glossed.
+
+Four things about that shape:
+
+**Plan and apply share a run, because they must share an emulator.** floci is fresh every
+run and its state dies with it, so a plan produced in an earlier run describes state that no
+longer exists. `apply` therefore plans and applies in one job. The consequence is that
+"review the plan, then apply it" across two runs gives you two different plan files
+describing the same intent — see ADR 0003, which does not pretend otherwise.
 
 **The plan is saved and applied, rather than re-planned.** `apply` without a plan file plans
 again, so what runs is not necessarily what was reviewed. Saving it with `-out` and publishing
@@ -66,8 +88,10 @@ works against a persistent local floci, where state genuinely accumulates and in
 applies do what you want. Terraform 1.10+ gives S3-native locking with `use_lockfile`, so
 there is no DynamoDB lock table.
 
-One ordering problem to expect: the state bucket must exist before `terraform init`, and
-Terraform is what creates buckets. One bootstrap step with the AWS CLI, before init.
+One ordering problem, now handled: the state bucket must exist before `terraform init`, and
+Terraform is what creates buckets. The workflow bootstraps it with the AWS CLI before init,
+reading the bucket name out of the backend block so the two cannot drift, and failing loudly
+if it cannot find one.
 
 **GitHub has no managed state backend.** GitLab ships one — an HTTP backend with encryption,
 locking and versioning, authenticated against GitLab roles. GitHub has no equivalent, so S3 is

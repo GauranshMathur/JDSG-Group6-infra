@@ -72,7 +72,10 @@ a cluster that no longer matches the reference design. It gets an ADR.
 - **Track A, Terraform (taken first).** The reference design written as Terraform and applied
   against floci. This proves the config stands up; it never runs the app. One root, no
   modules, files split by concern. Terraform stops at AWS — Kubernetes objects stay as
-  manifests. `terraform apply` against a clean emulator is a CI gate.
+  manifests. `terraform apply` against a clean emulator must succeed, and is run **on
+  demand** — `plan` and `apply` are `workflow_dispatch` only, with a typed confirmation on
+  apply ([ADR 0003](docs/adr/0003-terraform-runs-on-demand.md)). `fmt` and `validate` are
+  the automatic checks. Do not add a `pull_request` trigger to `terraform.yml`.
 - **Track B, runtime.** A real local Kubernetes cluster (k3d) running the app, and where load
   and stress testing happen. Real PostgreSQL, real object storage, real ingress. Nothing here
   depends on floci.
