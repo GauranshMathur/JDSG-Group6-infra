@@ -3,109 +3,52 @@
 The infrastructure for the [JDSG-Group6 Twitter clone](https://github.com/GauranshMathur/JDSG-Group6-app):
 an enterprise AWS architecture as the *reference design*, realized entirely locally.
 
-**This is a proof of concept, and there will never be a real AWS account.** Nothing here bills,
-and nothing is deployed to a cloud. The AWS design is drawn and written as a real account
-would be, and then stood up against a local emulator and a local Kubernetes cluster. Where a
-decision trades production robustness for something working and understandable, it takes the
-second, and says so at the point it takes it.
+**This is a proof of concept, and there will never be a real AWS account.** Nothing bills,
+nothing deploys to a cloud. The AWS design is drawn as a real account would be, then stood
+up against a local emulator ([floci](docs/floci.md)) and a local Kubernetes cluster.
 
-> **Status: I-1a — design agreed, Terraform not yet written.** The reference design and the
-> diagram exist. What remains of I-1a is the toolchain verification in [`docs/floci.md`](docs/floci.md).
-> No Terraform is written until that is answered, and **no real cloud resources, ever.**
+![AWS reference architecture](docs/diagrams/aws-reference-architecture.svg)
 
----
-
-## The two repositories
-
-| Repository | Holds |
-| --- | --- |
-| [JDSG-Group6-app](https://github.com/GauranshMathur/JDSG-Group6-app) | The Rails application, its tests and its pipeline |
-| **JDSG-Group6-infra** (here) | The reference design, Terraform, Kubernetes manifests, and the decisions behind them |
-
-They release independently and have separate pipelines. The app repository does not describe
-how it is deployed; this one does. The one thing that crosses the boundary is the container
-image — the app publishes to GHCR, and the cluster here pulls it.
+The app repository publishes a container image to GHCR
+(`ghcr.io/gauranshmathur/twitter-clone-web`); everything about where that image runs lives
+here. That image is the whole interface between the two repositories.
 
 ## Documentation
 
 | Document | What is in it |
 | --- | --- |
-| [Infrastructure](docs/infrastructure.md) | The AWS reference design, layer by layer, and how each piece is realized locally |
-| [floci](docs/floci.md) | The local AWS emulator: how deep each service's emulation goes, and what that forces |
-| [Roadmap](docs/roadmap.md) | The I-1 milestones, in two independent tracks |
-| [CI/CD](docs/ci-cd.md) | The pipeline for this repository |
-| [Requirements](REQUIREMENTS.md) | Numbered, testable requirements and whether each is met |
-| [Open questions](docs/open-questions.md) | Decisions not yet taken — a live list, pruned as they are answered |
-| [Decision records](docs/adr/) | Why a choice was made, and what it cost |
-
-## Architecture
-
-The enterprise AWS reference design — realized entirely locally, since there will never be a
-real AWS account. The reasoning, layer by layer, is in
-[docs/infrastructure.md](docs/infrastructure.md).
-
-![AWS reference architecture](docs/diagrams/aws-reference-architecture.svg)
-
-This image never goes stale: the source of truth is
-[`aws-reference-architecture.drawio`](docs/diagrams/aws-reference-architecture.drawio),
-editable online in
-[app.diagrams.net](https://app.diagrams.net/#HGauranshMathur%2FJDSG-Group6-infra%2Fmain%2Fdocs%2Fdiagrams%2Faws-reference-architecture.drawio)
-straight from this repository, and a workflow re-renders the SVG on every push that changes
-it — see [CI/CD](docs/ci-cd.md).
-
-## Two tracks, not one
-
-Decided in [ADR 0001](docs/adr/0001-terraform-verifies-runtime-deploys.md). The Terraform and
-the running app are separate exercises that do not depend on each other:
-
-| | Terraform + floci | Local Kubernetes + manifests |
-| --- | --- | --- |
-| Purpose | Prove the infrastructure-as-code stands up | Actually run the app |
-| Proves | The resource graph is coherent, dependencies resolve, nothing reaches a missing API | The app serves; load, stress and latency behaviour |
-| Runs the app | Never | Yes |
-| Backing services | Emulated, metadata-shaped | Real PostgreSQL, real object storage, real ingress |
-| Where it runs | CI, on every pull request | Locally, on demand |
-
-floci's emulation is two-tiered — a handful of services run real engines in Docker, and
-everything else answers the API while doing nothing. Betting the deployment on the first tier
-being deep enough is the risk this split removes.
+| [Architecture](docs/architecture.md) | The reference design, layer by layer, and how each piece is realized locally |
+| [Decisions](docs/decisions.md) | Every decision taken, dated, with what it cost — and the short list still undecided |
+| [floci](docs/floci.md) | The emulator: how deep each service goes, and the measured facts |
 
 ## Repository layout
 
 ```
-JDSG-Group6-infra/
-├── infra/
-│   ├── terraform/        # AWS resources (I-1b — in progress; planned on every PR, applied on merge)
-│   ├── kubernetes/       # Manifests, cluster-agnostic (I-1d)
-│   └── docker/           # Compose files for local dev and the emulator
-├── .github/
-│   └── workflows/        # This repository's pipeline
-└── docs/                 # Design, decisions, open questions
-    ├── infrastructure.md
-    ├── floci.md
-    ├── roadmap.md
-    ├── ci-cd.md
-    ├── open-questions.md
-    ├── adr/
-    └── diagrams/
+infra/
+├── terraform/        # The reference design as Terraform, verified in CI against floci
+├── kubernetes/       # Manifests, cluster-agnostic (not started yet)
+└── docker/           # Compose files: the emulator, and PostgreSQL for local dev
+.github/workflows/    # CI (lint + security scan), Terraform (apply against floci), diagram render
+docs/                 # The three documents above, plus the diagram source
 ```
 
-Naming rules: folder names are lowercase and hyphenated. Terraform stops at AWS —
-Kubernetes objects stay as manifests under `infra/kubernetes/`, never generated by the
-`kubernetes` Terraform provider. See [ADR 0001](docs/adr/0001-terraform-verifies-runtime-deploys.md).
-
-## Getting started
-
-Nothing here stands anything up yet. What exists today:
+## Running things
 
 ```bash
 # The local AWS emulator
 docker compose -f infra/docker/floci-compose.yml up -d
-curl http://localhost:4566/_localstack/health     # floci speaks the LocalStack API
+
+# Apply the Terraform against it (same thing CI does)
+cd infra/terraform && terraform init && terraform apply
 
 # PostgreSQL, for when the app moves off SQLite
 docker compose -f infra/docker/app-compose.yml up -d
 ```
 
-Terraform arrives with I-1b. When it does, the loop is `fmt` → `validate` → `plan` → `apply`
-against floci, and the same commands run in CI.
+## What's next
+
+- The app running on a local k3d cluster — real PostgreSQL, object storage, Traefik.
+- Kubernetes manifests under `infra/kubernetes/`, kept cluster-agnostic.
+- The remaining Terraform slices — network, EKS, RDS, IAM — one at a time.
+- Resiliency demos: rolling deploys under load, node loss, zone loss, HPA.
+- Load and latency testing, and the improvement loop it feeds.
