@@ -30,7 +30,7 @@ automatic ECR-to-k3s wiring, so the cluster needs egress and possibly a pull sec
 Measured, twice: floci accepts `CreateDistribution` and returns an object that segfaults
 the AWS provider on read-back — on every provider version from 4.67 to 6.59, so no pin
 escapes it, and Terraform has no way to skip one resource in an apply. The diagram keeps
-CloudFront as the front door; the Terraform's edge chain starts at the ALB. Cost: the
+CloudFront as the front door; the Terraform's edge chain starts at the NLB. Cost: the
 Terraform doesn't match the diagram at the edge, and if this ever points at real AWS the
 CloudFront config gets written from scratch.
 
@@ -54,6 +54,14 @@ durably stored nothing. Now: local state (gitignored), and the `Terraform` check
 with a throwaway emulator, an apply is free and side-effect-free, and a green check means
 "this configuration stands up from nothing". Cost: none of the production state/backend
 patterns are demonstrated here; if that lesson is ever wanted, it is a decision away.
+
+## 2026-08-18 — The NLB fronts the ALB
+
+Ingress runs internet gateway → NLB → ALB, not straight to the ALB as the diagram
+previously showed. The NLB is the perimeter's L4 entry point — one fixed-address front
+door that hands connections on without inspecting them — and the ALB behind it does host
+and path routing, TLS and the OIDC sign-in hop. Cost: an extra hop and a second load
+balancer on the applied path, which against floci is roughly another minute of apply time.
 
 ## 2026-08-18 — Trivy is the one security gate
 
