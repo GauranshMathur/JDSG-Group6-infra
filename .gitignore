@@ -12,3 +12,6 @@ tfplan
 # Never commit anything resembling a real credential
 .env
 *.pem
+
+# macOS
+.DS_Store
