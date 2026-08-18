@@ -155,9 +155,9 @@ can drift; keep manifests cluster-agnostic.
   settled by an apply, and an apply needs Terraform. Any future spike follows the same shape:
   minimal, under `spike/`, gating nothing, deleted once its answers are recorded.
 - **A spike is run on a pull request and deleted before that pull request merges.** Both
-  spikes so far learned this the same way: `security.yml`'s Trivy scan is `scan-ref: .`, the
+  spikes so far learned this the same way: `ci.yml`'s Trivy scan is `scan-ref: .`, the
   whole repository, gating on HIGH and CRITICAL — so throwaway Terraform, which is
-  deliberately unencrypted and unrestricted, turns `Security` red and *cannot* be merged.
+  deliberately unencrypted and unrestricted, turns `CI` red and *cannot* be merged.
   That is the gate working. The sequence is: open the pull request, let CI run the
   experiment, read the answer, delete the spike in the same pull request, merge green.
   **Never** add `skip-dirs`, narrow `scan-ref`, or otherwise quiet the scanner to get a
