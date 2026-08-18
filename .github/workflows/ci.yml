@@ -76,35 +76,8 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: "1"
 
-  # The automatic half of the Terraform pipeline (I-2.3, I-2.4): format and
-  # validate need no emulator, create nothing, and are the checks worth
-  # running on every change. `plan` and `apply` are deliberately NOT here —
-  # they are workflow_dispatch only, in terraform.yml, with a typed
-  # confirmation on apply (ADR 0003).
-  #
-  # `init -backend=false` skips the S3 backend on purpose: validation needs
-  # the provider schema, not state, so this job needs neither floci nor the
-  # bootstrap step.
-  terraform:
-    name: Terraform fmt and validate
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.13.1
-          terraform_wrapper: false
-
-      - name: Format check
-        working-directory: infra/terraform
-        run: terraform fmt -check -recursive -no-color
-
-      - name: Init without backend
-        working-directory: infra/terraform
-        run: terraform init -backend=false -no-color
-
-      - name: Validate
-        working-directory: infra/terraform
-        run: terraform validate -no-color
+  # Terraform checks are NOT here: fmt, validate and plan run in
+  # terraform.yml on every pull request that touches the Terraform, with
+  # the plan posted as a PR comment, and apply runs on merge (ADR 0004).
+  # That workflow is path-scoped because it starts an emulator, which a
+  # docs-only change has no business paying for.

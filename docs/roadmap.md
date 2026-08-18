@@ -34,8 +34,8 @@ Taken first.
 
 | # | Milestone | Status |
 | --- | --- | --- |
-| I-1b | The full infrastructure pipeline: the reference design written as Terraform, with `fmt` → `validate` → `plan` (saved as an artifact) → `apply` against floci, and state in S3 | **In progress** — pipeline merged (manual plan/apply, ADR 0003; fmt/validate automatic in ci.yml) and the first slice with it: backend on the emulator's S3, provider, KMS, media bucket |
-| I-1c | The automatic checks become required to merge — `fmt`, `validate`, the scans. `apply` stays on demand by [ADR 0003](adr/0003-terraform-runs-on-demand.md), so it never gates a merge; reworded from "apply must succeed before a pull request merges", which that ADR overturned | Planned |
+| I-1b | The full infrastructure pipeline: the reference design written as Terraform, with `fmt` → `validate` → `plan` (saved as an artifact) → `apply` against floci, and state in S3 | **In progress** — pipeline merged in its standard shape (plan on every Terraform-touching pull request, posted as a PR comment; apply on merge — [ADR 0004](adr/0004-terraform-plan-on-pr-apply-on-merge.md)), and the first slice with it: backend on the emulator's S3, provider, KMS, media bucket |
+| I-1c | The automatic checks become required to merge — the scans, and the Terraform plan on pull requests that touch it. The apply never gates a merge: it runs *on* the merge, downstream ([ADR 0004](adr/0004-terraform-plan-on-pr-apply-on-merge.md)) | Planned — with a known wrinkle: the Terraform workflow is path-scoped, and a required check that never starts shows as pending forever |
 
 ### Track B — Runtime, the app actually running
 
@@ -87,7 +87,8 @@ you would want.
 Chicken-and-egg to expect: the state bucket must exist before `terraform init`, and Terraform
 is what creates buckets. One bootstrap step with the AWS CLI, before init.
 
-**I-1c — the gate.** Nothing merges without the automatic checks passing. The apply is deliberately not among them (ADR 0003): it runs when a person runs it.
+**I-1c — the gate.** Nothing merges without the automatic checks passing. The apply is not
+among them — it is what the merge itself runs, downstream of the gate (ADR 0004).
 
 **I-1d to I-1g — the runtime.** A real cluster, the app on it, then resiliency and load. This
 is where the three app changes land, and where every figure worth measuring is measured.

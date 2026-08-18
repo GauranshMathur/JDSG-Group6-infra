@@ -1,7 +1,13 @@
 # ADR 0003 — `terraform plan` and `apply` run on demand, not on a trigger
 
-**Status:** Accepted
+**Status:** Superseded by [ADR 0004](0004-terraform-plan-on-pr-apply-on-merge.md)
 **Date:** 2026-08-13
+
+> Superseded five days later: the owner, reviewing the canonical flow (HashiCorp's GitHub
+> Actions tutorial and implementations of it), chose plan-on-pull-request and
+> apply-on-merge over the manual-only shape below. The analysis here — especially why
+> cross-run plan review cannot work against an ephemeral emulator — still holds and is
+> carried forward by ADR 0004; what changed is the conclusion drawn from it.
 
 ## Context
 

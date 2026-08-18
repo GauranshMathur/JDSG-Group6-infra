@@ -5,8 +5,8 @@ kind of thing.
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
-| `ci.yml` | Pull requests | Workflow lint, Compose validation, misconfiguration scan, Terraform `fmt` + `validate` |
-| `terraform.yml` | **Manual only** (`workflow_dispatch`) | Terraform `plan` and `apply` against floci, typed confirmation on apply — [ADR 0003](adr/0003-terraform-runs-on-demand.md) |
+| `ci.yml` | Pull requests | Workflow lint, Compose validation, misconfiguration scan |
+| `terraform.yml` | PRs touching the Terraform; pushes to `main`; manual `plan` | `fmt` → `validate` → `plan` against floci, plan posted on the PR; **apply on merge** — [ADR 0004](adr/0004-terraform-plan-on-pr-apply-on-merge.md) |
 | `security.yml` | Pull requests | Trivy filesystem scan — secrets, dependencies, misconfiguration |
 | `render-diagrams.yml` | Pushes to `main` touching a `.drawio` | Re-renders the architecture diagram to SVG |
 
@@ -20,6 +20,10 @@ here is infrastructure, so one pipeline runs and nothing is ever skipped.
 That also removes the machinery the routing needed — a router, an aggregate gate job to avoid
 required-check deadlock, and a test suite for the router itself. Worth remembering as a
 general point: **a lot of pipeline complexity is a monorepo cost**, not an inherent one.
+
+The one path filter that does exist is `terraform.yml`'s: it starts an emulator, which a
+docs-only change has no business paying for. Everything in `ci.yml` and `security.yml`
+still runs on every pull request.
 
 ## `ci.yml`
 
@@ -39,44 +43,46 @@ already slipped through.
 
 ## `terraform.yml` — the Terraform pipeline
 
-**Manual only, and that is the point** ([ADR 0003](adr/0003-terraform-runs-on-demand.md)).
-There is no `pull_request` or `push` trigger: `plan` and `apply` are `workflow_dispatch`,
-and `apply` additionally requires typing `APPLY` into a confirmation input, checked before
-anything else runs. Applying infrastructure is a thing a person decides to do, not a thing a
-merge does — harmless here, where the emulator is ephemeral and there is no AWS account, but
-this pipeline is written to be the shape a real one would take.
-
-The workflow briefly existed ahead of any Terraform — safe, because a
-`workflow_dispatch`-only workflow never fires on its own. Since the first I-1b slice
-landed in `infra/terraform/` it runs against real configuration; it still fails with a
-clear message if that directory is ever empty.
+**The standard flow** ([ADR 0004](adr/0004-terraform-plan-on-pr-apply-on-merge.md), the
+shape of HashiCorp's own
+[GitHub Actions tutorial](https://developer.hashicorp.com/terraform/tutorials/automation/github-actions)):
+a pull request that touches the Terraform is planned, and merging it applies.
 
 ```
-(refuse unconfirmed apply)              → before anything else runs
-(bootstrap the state bucket)            → AWS CLI, before init
-terraform init                          # S3 backend on floci
-terraform fmt -check -recursive
-terraform validate
-terraform plan -out=tfplan              → uploaded as a build artifact
-terraform apply tfplan                  → only when action=apply
+On a pull request touching infra/terraform/** (or this workflow):
+  (bootstrap the state bucket)          → AWS CLI, before init
+  terraform fmt -check -recursive
+  terraform init                        # S3 backend on floci
+  terraform validate
+  terraform plan -out=tfplan            → uploaded as an artifact, AND
+                                          posted on the PR as a comment
+
+On a push to main touching the same paths (i.e. a merge):
+  the same steps, then
+  terraform apply tfplan                → the plan produced in this run
+
+On workflow_dispatch: the plan half only — an on-demand check.
 ```
 
-**What stays automatic is `fmt -check` and `validate`**, as a `ci.yml` job on every pull
-request. They need no emulator (`init -backend=false` fetches provider schemas without
-touching state), create nothing, and are the checks worth running on every change. What is lost by making the rest manual — that nothing now catches a
-configuration which fails to plan — is recorded as the cost in ADR 0003 rather than glossed.
+The PR comment is the review surface: one comment per pull request, updated in place on
+every push, carrying each step's outcome and the full plan in a collapsible section. `fmt`,
+`validate` and `plan` continue through failure so the comment always reports all four, and
+the job is failed explicitly afterwards.
 
-Four things about that shape:
+**Merging is the confirmation.** ADR 0003 briefly made all of this manual-only with a typed
+confirmation; ADR 0004 superseded it. What survives from that record is its analysis, and
+one production note: with a real account, the guard on the apply job is a GitHub
+Environment with required reviewers — a merge should not reach real infrastructure without
+one. Here nothing is real, so nothing gates it.
 
-**Plan and apply share a run, because they must share an emulator.** floci is fresh every
-run and its state dies with it, so a plan produced in an earlier run describes state that no
-longer exists. `apply` therefore plans and applies in one job. The consequence is that
-"review the plan, then apply it" across two runs gives you two different plan files
-describing the same intent — see ADR 0003, which does not pretend otherwise.
+Three things about the shape:
 
-**The plan is saved and applied, rather than re-planned.** `apply` without a plan file plans
-again, so what runs is not necessarily what was reviewed. Saving it with `-out` and publishing
-it as an artifact closes that gap and leaves the plan readable on the run page.
+**Plan and apply cannot share a file across runs, because each run gets a fresh emulator.**
+floci's state dies with its container, so the pull request's plan describes an emulator
+instance that no longer exists by the merge. The merge run therefore plans again and
+applies the plan file *it* produced — within the run, what was published is what runs;
+across runs, the two plans can only describe the same intent. ADR 0004 carries this
+forward from ADR 0003 without pretending otherwise.
 
 **floci runs as a service container, fresh every run.** That means every apply starts from
 nothing, which is exactly the assertion: *this configuration stands up against a clean
@@ -157,10 +163,11 @@ duration to be dominated by waiting rather than working; set the timeout accordi
 
 ## Required status checks
 
-`main` has none yet, so nothing gates a merge and auto-merge cannot arm. That is deliberate for
-now — requiring checks against a pipeline that validates two Compose files would be ceremony.
-It changes with I-1b, when `terraform apply` against a clean emulator becomes something worth
-requiring.
+`main` has none yet, so nothing gates a merge and auto-merge cannot arm. That is deliberate
+for now. It changes with I-1c: the scans and the Terraform plan become required. The apply
+can never be among them — it runs *on* the merge, downstream of any gate — and requiring
+the plan needs care, because the Terraform workflow is path-scoped and GitHub shows a
+required check that never starts as pending forever.
 
 ## Versioning
 
