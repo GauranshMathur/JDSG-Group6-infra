@@ -43,3 +43,29 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 - **Frontier query**: list the map's open children (`gh issue list --state open`, scoped to the map's sub-issues / task list), drop any with an open blocker (`issue_dependencies_summary.blocked_by > 0`, or an open issue in the `Blocked by` line) or an assignee; first in map order wins.
 - **Claim**: `gh issue edit <n> --add-assignee @me` — the session's first write.
 - **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.
+
+## How issues relate to the docs
+
+**The docs say why; the issues say what is next; each links the other.** Adopted 2026-08-19,
+at the same time as the app repository, so the two work the same way.
+
+`docs/architecture.md` holds the reference design, `docs/decisions.md` holds what was decided
+and what is still open, and `docs/floci.md` holds what the emulator actually does. Those are
+written to be read a year later; an issue tracker is not. Alongside them, identified work
+gets an issue, so "what are we doing next" has one answer:
+
+- The issue carries the work, and links back to the document explaining why.
+- The document keeps its entry and names the issue — the `Undecided` list in
+  `decisions.md` and the `What's next` list in `README.md` are the worked examples. An
+  entry is not deleted when its issue closes; a decision that was taken becomes a dated
+  paragraph in `decisions.md`, which is the record.
+
+**The repository boundary decides the tracker.** Infrastructure work is an issue here.
+Application work — including the three app changes deploying forces — is an issue on
+[JDSG-Group6-app](https://github.com/GauranshMathur/JDSG-Group6-app), linked from the
+infrastructure issue that needs it. This mirrors the rule that the two repositories never
+share a pull request.
+
+**Labels.** `terraform` and `runtime` mark the two tracks from
+[ADR-era decisions](../decisions.md), so either can be listed on its own with
+`gh issue list --label`. Triage labels are in [`triage-labels.md`](triage-labels.md).
