@@ -47,8 +47,18 @@ docker compose -f infra/docker/app-compose.yml up -d
 
 ## What's next
 
-- The app running on a local k3d cluster — real PostgreSQL, object storage, Traefik.
-- Kubernetes manifests under `infra/kubernetes/`, kept cluster-agnostic.
-- The remaining Terraform slices — network, EKS, RDS, IAM — one at a time.
-- Resiliency demos: rolling deploys under load, node loss, zone loss, HPA.
-- Load and latency testing, and the improvement loop it feeds.
+Each of these is a [tracked issue](https://github.com/GauranshMathur/JDSG-Group6-infra/issues) —
+the issues are the queue, this list and `docs/` remain the record.
+
+**Track A, the Terraform.** S3 and KMS are applied; the rest goes in slices:
+
+- [#19](https://github.com/GauranshMathur/JDSG-Group6-infra/issues/19) network — VPC, subnets, security groups, IGW, NAT, transit gateway
+- [#20](https://github.com/GauranshMathur/JDSG-Group6-infra/issues/20) edge — NLB in front of ALB, WAF, ACM, Route 53
+- [#21](https://github.com/GauranshMathur/JDSG-Group6-infra/issues/21) data and platform — RDS, ECR, IAM, SSM
+- [#22](https://github.com/GauranshMathur/JDSG-Group6-infra/issues/22) the cluster itself, blocked on [#18](https://github.com/GauranshMathur/JDSG-Group6-infra/issues/18) — community EKS module or hand-rolled
+
+**Track B, the runtime.** Independent of Track A and of the emulator:
+
+- [#23](https://github.com/GauranshMathur/JDSG-Group6-infra/issues/23) the local cluster — k3d, Traefik, real PostgreSQL, object storage
+- [#24](https://github.com/GauranshMathur/JDSG-Group6-infra/issues/24) the app served on it, and the three changes it forces in the app repository
+- [#25](https://github.com/GauranshMathur/JDSG-Group6-infra/issues/25) resiliency demos and load testing — rolling deploys under load, node loss, zone loss, HPA

@@ -73,15 +73,20 @@ is genuinely not actionable, say so in the PR.
 
 ## Undecided
 
+Each is argued in the issue named beside it and, once settled, becomes a dated paragraph
+above. The issue is where the arguing happens; this file is where the answer lives.
+
 - **EKS: community module or hand-rolled?** The module applies against floci with exactly
   two overrides (`encryption_config = null`, `enable_irsa = false`) but that cluster no
   longer matches the reference design, and the module drags in a nested KMS module.
-  Decide before `eks.tf` is written.
+  Decide before `eks.tf` is written — [#18](https://github.com/GauranshMathur/JDSG-Group6-infra/issues/18).
 - **k3d, kind or minikube** for the local cluster. k3d is the likely answer (k3s in
-  Docker, ships Traefik and ServiceLB). Decide when the cluster work starts.
+  Docker, ships Traefik and ServiceLB). Decide when the cluster work starts —
+  [#23](https://github.com/GauranshMathur/JDSG-Group6-infra/issues/23).
 - **MinIO or floci's S3** as the object storage the running app uses. Decide when media
-  storage is wired up.
+  storage is wired up — [#23](https://github.com/GauranshMathur/JDSG-Group6-infra/issues/23).
 - **Solid Cache or Redis** for the shared cache — an app-repo change, forced the moment
-  there are two replicas.
-- **Load-test tooling** — k6 and Toxiproxy are the candidates. Decide when load testing
-  starts.
+  there are two replicas — [#24](https://github.com/GauranshMathur/JDSG-Group6-infra/issues/24).
+- **Load-test tooling** — k6 and Toxiproxy are the candidates, and the app repository
+  already has a k6 suite worth reusing. Decide when load testing starts —
+  [#25](https://github.com/GauranshMathur/JDSG-Group6-infra/issues/25).
