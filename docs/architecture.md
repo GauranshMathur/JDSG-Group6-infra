@@ -31,8 +31,8 @@ The two describe the same cluster and can drift; keeping the manifests cluster-a
 ## The reference design, layer by layer
 
 **Edge (global).** DNS at Route 53, CloudFront as the CDN front door over 443, WAF with
-managed rule sets, certificates from ACM. CloudFront's origin is the ALB, which never sees
-the internet directly. Cognito is drawn as the reference sign-in path but is
+managed rule sets, certificates from ACM. CloudFront's origin is the NLB, so nothing behind
+the perimeter ever sees the internet directly. Cognito is drawn as the reference sign-in path but is
 reference-only — the app owns its authentication in Rails. IAM (roles, IRSA) and KMS
 (keys for RDS, S3, EBS) sit at this layer as the global services everything leans on.
 
@@ -43,10 +43,16 @@ EKS node groups and RDS in private subnets and has no internet gateway — every
 or out crosses the transit gateway. NAT carries cluster-started egress only. A DR VPC
 (10.2.0.0/16) stands ready over inter-region TGW peering.
 
-**Ingress.** Two load balancer types, deliberately: the ALB is the L7 path, created by the
-AWS Load Balancer Controller from the Kubernetes `Ingress`; the NLB is the L4 path
-fronting the in-cluster ingress controller. Locally the NLB-shaped path is the one that
-survives: k3s's ServiceLB does real L4 and Traefik plays the ingress controller.
+**Ingress.** Two load balancer types in series, deliberately. Traffic crosses the internet
+gateway and reaches the **NLB** first: the L4 entry point, which gives the perimeter a
+fixed-address front door and hands the connection on without inspecting it. The NLB
+forwards to the **ALB**, which does the L7 work — host and path routing, TLS from ACM, and
+the OIDC sign-in hop against Cognito in the reference design. The ALB is created and kept
+in sync by the AWS Load Balancer Controller from the Kubernetes `Ingress`.
+
+Locally neither forwards a packet, since floci emulates both at the API level only. The
+NLB's job is the one that survives: k3s's ServiceLB does real L4, and Traefik plays the
+ingress controller the ALB stands in for.
 
 **Cluster.** Private subnets, two AZs, an EKS managed node group per zone. Deployment with
 replicas ≥ 2, readiness probing `/up`, a PodDisruptionBudget, HPA scaling replicas and the
