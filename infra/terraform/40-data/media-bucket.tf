@@ -1,5 +1,7 @@
 # Media storage — the bucket Active Storage moves to when the app leaves
-# pod-local disk. Encrypted with the customer-managed key in kms.tf.
+# pod-local disk. Application state, which is why it lives here beside the
+# database rather than in the foundation layer, and why it reaches across for
+# the key rather than owning one.
 
 resource "aws_s3_bucket" "media" {
   bucket = "${local.name_prefix}-media"
@@ -19,7 +21,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "media" {
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm     = "aws:kms"
-      kms_master_key_id = aws_kms_key.s3.arn
+      kms_master_key_id = data.terraform_remote_state.foundation.outputs.s3_kms_key_arn
     }
   }
 }

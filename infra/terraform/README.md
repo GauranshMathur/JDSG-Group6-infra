@@ -17,13 +17,17 @@ be building on subnets that exist only in another layer's state.
 **The workspace is `twitter-clone-NN`, where NN is the directory's prefix** — `10-network`
 writes its state to `twitter-clone-10`.
 
+Foundation holds keys and nothing else. Anything the application stores lives with the data
+layer, so the media bucket sits beside the database rather than under a name that only ever
+meant "built first".
+
 | Layer | Workspace | Holds | Status |
 | --- | --- | --- | --- |
-| `00-foundation` | `twitter-clone-00` | KMS keys, media bucket | applied |
+| `00-foundation` | `twitter-clone-00` | KMS keys — and nothing else | applied |
 | `10-network` | `twitter-clone-10` | VPCs, subnets, gateways, routing, NACLs, security groups, transit gateway | scaffolded, empty |
 | `20-edge` | `twitter-clone-20` | ACM, NLB, ALB, WAF, Route 53 | not started |
 | `30-platform` | `twitter-clone-30` | ECR, IAM, SSM | not started |
-| `40-data` | `twitter-clone-40` | RDS | not started |
+| `40-data` | `twitter-clone-40` | Media bucket, and RDS when it lands | applied |
 | `50-cluster` | `twitter-clone-50` | EKS, node groups | not started |
 | `60-reliability` | `twitter-clone-60` | Backup, S3 replication, failover | not started |
 
