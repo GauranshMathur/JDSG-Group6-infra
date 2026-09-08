@@ -37,6 +37,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 # One workspace and one agent, so two runs at once would queue behind each other
 # in HCP Terraform anyway. Serialize here instead, where it is visible.
@@ -139,7 +140,12 @@ jobs:
       - run: terraform fmt -check -recursive -no-color
       - run: terraform init -no-color
       - run: terraform validate -no-color
-      - run: terraform apply -auto-approve -no-color
+
+      # `shell: bash` rather than the default, for pipefail: without it `tee`
+      # would swallow a failing terraform and the step would pass.
+      - name: terraform apply
+        shell: bash
+        run: terraform apply -auto-approve -no-color | tee "$RUNNER_TEMP/apply.log"
 
       # The emulator is created and destroyed with the job, so a destroy only
       # means anything in the same job that applied. On its own it would meet an
@@ -148,7 +154,58 @@ jobs:
       # resources the step above just created, and the workspace goes 6 -> 0.
       - name: Destroy what was just applied
         if: inputs.destroy
-        run: terraform destroy -auto-approve -no-color
+        shell: bash
+        run: terraform destroy -auto-approve -no-color | tee "$RUNNER_TEMP/destroy.log"
+
+      # Two places to look is one too many. The run's own page gets the outcome
+      # and a link into HCP Terraform, where the plan and apply are readable
+      # rather than buried in a shell log.
+      - name: Summarise the run
+        if: always()
+        shell: bash
+        run: |
+          # GITHUB_STEP_SUMMARY is a different file in every step, so the panel
+          # is built in a real file first: this step appends it to its own
+          # summary, and the step after reads it back to comment.
+          summary="$RUNNER_TEMP/summary.md"
+          : > "$summary"
+          summarise() {
+            local title="$1" log="$2" result url
+            [ -f "$log" ] || return 0
+            result=$(grep -aoE '(Apply|Destroy) complete! Resources:.*' "$log" | tail -1 || true)
+            url=$(grep -aoE 'https://app\.terraform\.io/app/[^ ]+/runs/run-[A-Za-z0-9]+' "$log" | tail -1 || true)
+            {
+              echo "### Terraform — $title"
+              echo
+              echo "| | |"
+              echo "| --- | --- |"
+              echo "| Result | ${result:-did not complete} |"
+              if [ -n "$url" ]; then
+                echo "| HCP run | [${url##*/}]($url) |"
+              else
+                echo "| HCP run | [twitter-clone workspace](https://app.terraform.io/app/JDSG-Group6/workspaces/twitter-clone/runs) |"
+              fi
+              echo
+            } >> "$summary"
+          }
+          summarise apply "$RUNNER_TEMP/apply.log"
+          summarise destroy "$RUNNER_TEMP/destroy.log"
+          cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+
+      # The same panel, on the pull request, edited in place rather than added
+      # to on every push. --create-if-none is recent; the fallback covers a
+      # runner whose gh predates it.
+      - name: Put the summary on the pull request
+        if: always() && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.number }}
+        run: |
+          summary="$RUNNER_TEMP/summary.md"
+          [ -s "$summary" ] || { echo "::warning::no summary was produced"; exit 0; }
+          gh pr comment "$PR" --body-file "$summary" --edit-last --create-if-none \
+            || gh pr comment "$PR" --body-file "$summary"
 
       # SIGTERM, so the agent deregisters instead of leaving a dead entry
       # occupying the one agent the free tier allows.
