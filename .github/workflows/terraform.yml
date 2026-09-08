@@ -94,11 +94,14 @@ jobs:
           terraform_version: 1.13.1
           terraform_wrapper: false
 
+      # 127.0.0.1 rather than localhost: floci binds 0.0.0.0, which is IPv4
+      # only, and a resolver that answers localhost with ::1 first turns a
+      # healthy emulator into a connection refused.
       - name: Wait for floci
         run: |
           set -euo pipefail
           for _ in $(seq 1 30); do
-            curl -fsS --max-time 5 http://localhost:4566/ >/dev/null 2>&1 && exit 0
+            curl -fsS --max-time 5 http://127.0.0.1:4566/ >/dev/null 2>&1 && exit 0
             sleep 2
           done
           echo "::error::floci did not answer on :4566"
@@ -119,11 +122,17 @@ jobs:
             hashicorp/tfc-agent:latest
 
       - name: Wait for the agent to register
+        env:
+          TFC_AGENT_NAME: ci-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           set -euo pipefail
           for _ in $(seq 1 60); do
             if docker logs tfc-agent 2>&1 | grep -qi 'registered'; then
-              echo "Agent registered with HCP Terraform."
+              # Named in the log so a run in HCP Terraform can be matched to the
+              # agent that executed it. A run picked up by any other agent in the
+              # pool cannot reach this job's emulator.
+              echo "Agent '$TFC_AGENT_NAME' registered with HCP Terraform."
+              docker logs tfc-agent 2>&1 | grep -i 'registered' | tail -1
               exit 0
             fi
             if [ "$(docker inspect -f '{{.State.Running}}' tfc-agent)" != "true" ]; then
@@ -136,6 +145,19 @@ jobs:
           echo "::error::the agent did not register within 120s"
           docker logs tfc-agent
           exit 1
+
+      # The apply reaches floci on 127.0.0.1 only because the agent shares the
+      # runner's network namespace. Assert that here, rather than discovering it
+      # fifty seconds into an apply as nine retries and a connection refused.
+      - name: Check the agent shares the runner's network
+        run: |
+          set -euo pipefail
+          mode=$(docker inspect tfc-agent --format '{{.HostConfig.NetworkMode}}')
+          echo "agent network mode: $mode"
+          if [ "$mode" != "host" ]; then
+            echo "::error::the agent is on network '$mode', not host, so it cannot reach floci on 127.0.0.1"
+            exit 1
+          fi
 
       - run: terraform fmt -check -recursive -no-color
       - run: terraform init -no-color
@@ -173,6 +195,12 @@ jobs:
             local title="$1" log="$2" result url
             [ -f "$log" ] || return 0
             result=$(grep -aoE '(Apply|Destroy) complete! Resources:.*' "$log" | tail -1 || true)
+            # Nothing to do prints "No changes." and never the "complete!" line.
+            # That is a success, not a silence, and reporting it as "did not
+            # complete" on a green run sends you looking for a failure.
+            if [ -z "$result" ] && grep -qaE 'No changes\.|Planned and finished' "$log"; then
+              result="No changes"
+            fi
             url=$(grep -aoE 'https://app\.terraform\.io/app/[^ ]+/runs/run-[A-Za-z0-9]+' "$log" | tail -1 || true)
             {
               echo "### Terraform — $title"
@@ -183,7 +211,7 @@ jobs:
               if [ -n "$url" ]; then
                 echo "| HCP run | [${url##*/}]($url) |"
               else
-                echo "| HCP run | [twitter-clone workspace](https://app.terraform.io/app/JDSG-Group6/workspaces/twitter-clone/runs) |"
+                echo "| HCP run | [twitter-clone-00 workspace](https://app.terraform.io/app/JDSG-Group6/workspaces/twitter-clone-00/runs) |"
               fi
               echo
             } >> "$summary"
