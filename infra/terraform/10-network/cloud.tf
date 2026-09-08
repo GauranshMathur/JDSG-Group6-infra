@@ -16,7 +16,7 @@ terraform {
     organization = "JDSG-Group6"
 
     workspaces {
-      name = "10-network"
+      name = "twitter-clone-10"
     }
   }
 }

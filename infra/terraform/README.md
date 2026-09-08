@@ -14,18 +14,24 @@ be building on subnets that exist only in another layer's state.
 
 ## Layers
 
-**The workspace is named after the directory** — `10-network` the directory writes state to
-`10-network` the workspace. One rule, nothing to look up.
+**The workspace is `twitter-clone-NN`, where NN is the directory's prefix** — `10-network`
+writes its state to `twitter-clone-10`.
 
-| Layer / workspace | Holds | Status |
-| --- | --- | --- |
-| `00-foundation` | KMS keys, media bucket | applied |
-| `10-network` | VPCs, subnets, gateways, routing, NACLs, security groups, transit gateway | scaffolded, empty |
-| `20-edge` | ACM, NLB, ALB, WAF, Route 53 | not started |
-| `30-platform` | ECR, IAM, SSM | not started |
-| `40-data` | RDS | not started |
-| `50-cluster` | EKS, node groups | not started |
-| `60-reliability` | Backup, S3 replication, failover | not started |
+| Layer | Workspace | Holds | Status |
+| --- | --- | --- | --- |
+| `00-foundation` | `twitter-clone-00` | KMS keys, media bucket | applied |
+| `10-network` | `twitter-clone-10` | VPCs, subnets, gateways, routing, NACLs, security groups, transit gateway | scaffolded, empty |
+| `20-edge` | `twitter-clone-20` | ACM, NLB, ALB, WAF, Route 53 | not started |
+| `30-platform` | `twitter-clone-30` | ECR, IAM, SSM | not started |
+| `40-data` | `twitter-clone-40` | RDS | not started |
+| `50-cluster` | `twitter-clone-50` | EKS, node groups | not started |
+| `60-reliability` | `twitter-clone-60` | Backup, S3 replication, failover | not started |
+
+> **A typo here does not fail — it creates.** If `cloud.tf` names a workspace that does not
+> exist, `terraform init` creates it, and a workspace created that way defaults to **Remote**
+> execution. The run then executes on HashiCorp's workers, which have no floci on their
+> loopback, and the apply dies with `connection refused` after nine retries. Three runs were
+> lost to exactly this. Check the name, and check the execution mode of anything new.
 
 Layers below `60` are planned, not promised — see [decisions.md](../../docs/decisions.md).
 
@@ -68,7 +74,8 @@ must have remote state sharing enabled in HCP Terraform, or the read is denied.
 
 ## Adding a layer
 
-1. Create the workspace in HCP Terraform, CLI-driven, **named exactly like the directory**.
+1. Create the workspace in HCP Terraform, CLI-driven, named `twitter-clone-NN` for the
+   directory's prefix. Create it **before** the first init — see the warning above.
 2. Set **Execution mode: Agent** against the `jdsg` pool, and **Terraform version 1.13.1**.
 3. Enable **remote state sharing** if a layer above will read its outputs.
 4. Create the directory with the scaffolding files above; copy `.terraform.lock.hcl` from a
