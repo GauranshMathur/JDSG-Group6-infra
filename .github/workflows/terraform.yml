@@ -195,6 +195,12 @@ jobs:
             local title="$1" log="$2" result url
             [ -f "$log" ] || return 0
             result=$(grep -aoE '(Apply|Destroy) complete! Resources:.*' "$log" | tail -1 || true)
+            # Nothing to do prints "No changes." and never the "complete!" line.
+            # That is a success, not a silence, and reporting it as "did not
+            # complete" on a green run sends you looking for a failure.
+            if [ -z "$result" ] && grep -qaE 'No changes\.|Planned and finished' "$log"; then
+              result="No changes"
+            fi
             url=$(grep -aoE 'https://app\.terraform\.io/app/[^ ]+/runs/run-[A-Za-z0-9]+' "$log" | tail -1 || true)
             {
               echo "### Terraform — $title"
@@ -205,7 +211,7 @@ jobs:
               if [ -n "$url" ]; then
                 echo "| HCP run | [${url##*/}]($url) |"
               else
-                echo "| HCP run | [twitter-clone workspace](https://app.terraform.io/app/JDSG-Group6/workspaces/twitter-clone/runs) |"
+                echo "| HCP run | [twitter-clone-00 workspace](https://app.terraform.io/app/JDSG-Group6/workspaces/twitter-clone-00/runs) |"
               fi
               echo
             } >> "$summary"
