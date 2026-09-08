@@ -25,7 +25,8 @@ here. That image is the whole interface between the two repositories.
 
 ```
 infra/
-├── terraform/        # The reference design as Terraform, verified in CI against floci
+├── terraform/        # The reference design as Terraform — one root per layer, applied
+│                     # in directory order; see infra/terraform/README.md
 ├── kubernetes/       # Manifests, cluster-agnostic (not started yet)
 └── docker/           # Compose files: the emulator, and PostgreSQL for local dev
 .github/workflows/    # CI (lint + security scan), Terraform (HCP Terraform run against floci), diagram render
@@ -38,7 +39,7 @@ docs/                 # The three documents above, plus the diagram source
 [HCP Terraform](docs/decisions.md), and the `Terraform` workflow is the only thing that
 applies this configuration: it starts a throwaway floci on the runner, starts an agent
 beside it, and dispatches the run. To see a plan and an apply, push a change under
-`infra/terraform/`, or run the workflow by hand from the **Actions** tab — which also
+any layer under `infra/terraform/`, or run the workflow by hand from the **Actions** tab — which also
 takes a `destroy` option that tears the resources down again in the same job, so the
 workspace goes 6 resources to 0 and back.
 
@@ -46,11 +47,13 @@ Do not queue a run from the HCP Terraform UI. It will wait forever: the workspac
 on an agent, and the only agent that ever exists is the one the job starts and stops around
 the run.
 
-One-time setup, in the HCP Terraform organization named in `infra/terraform/cloud.tf` (or
-set `TF_CLOUD_ORGANIZATION`):
+One-time setup, in the HCP Terraform organization named in each layer's `cloud.tf` (or set
+`TF_CLOUD_ORGANIZATION`):
 
 1. Create an agent pool and an agent token.
-2. Create the `twitter-clone` workspace, **Execution mode: Agent**, against that pool.
+2. Create a workspace per layer — `twitter-clone-foundation`, `twitter-clone-network`, … —
+   each **Execution mode: Agent** against that pool. See
+   [`infra/terraform/README.md`](infra/terraform/README.md).
 3. Add two repository secrets — `TF_API_TOKEN` (a user or team token, for the CLI) and
    `TFC_AGENT_TOKEN` (the agent token). A pull request from a fork gets neither, so the
    Terraform check cannot run on one.

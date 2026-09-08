@@ -2,13 +2,20 @@ name: Terraform
 
 # The reference design applied against a fresh floci emulator, driven by HCP
 # Terraform. This workflow is the only thing that applies the configuration —
-# nothing is run by hand — and the run is dispatched to a self-hosted agent
+# nothing is run by hand — and each run is dispatched to a self-hosted agent
 # started here in the job, because HashiCorp's own workers cannot reach an
-# emulator on the runner's localhost and this agent can. State outlives the
-# emulator the resources were created in, so every plan reads as a first-time
-# create: "this configuration stands up from nothing" is the whole claim. There
-# is no real AWS account anywhere in this, and the provider's credentials are
-# the fake ones hardcoded in providers.tf.
+# emulator on the runner's localhost and this agent can.
+#
+# Every directory under infra/terraform/ matching NN-name is its own root with
+# its own workspace, and they are applied in directory order: 00 before 10
+# before 20. They share one job because they must share one emulator — a second
+# job would get a second, empty floci, and a layer would be building on subnets
+# that exist only in another layer's state.
+#
+# State outlives the emulator the resources were created in, so every plan reads
+# as a first-time create: "this configuration stands up from nothing" is the
+# whole claim. There is no real AWS account anywhere in this, and the provider's
+# credentials are the fake ones hardcoded in each root's providers.tf.
 #
 # Needs two repository secrets, so a pull request from a fork cannot run it:
 #   TF_API_TOKEN      a user or team token — authenticates the CLI
@@ -39,8 +46,8 @@ permissions:
   contents: read
   pull-requests: write
 
-# One workspace and one agent, so two runs at once would queue behind each other
-# in HCP Terraform anyway. Serialize here instead, where it is visible.
+# One agent, and layers that must apply in order, so two pipelines at once
+# would interleave. Serialize here, where it is visible.
 concurrency:
   group: terraform
   cancel-in-progress: false
@@ -55,10 +62,6 @@ jobs:
     name: Terraform
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
-    defaults:
-      run:
-        working-directory: infra/terraform
 
     # No Docker socket here: EKS applies in mock mode.
     services:
@@ -137,25 +140,44 @@ jobs:
           docker logs tfc-agent
           exit 1
 
-      - run: terraform fmt -check -recursive -no-color
-      - run: terraform init -no-color
-      - run: terraform validate -no-color
+      - run: terraform fmt -check -recursive -no-color infra/terraform
 
-      # `shell: bash` rather than the default, for pipefail: without it `tee`
-      # would swallow a failing terraform and the step would pass.
-      - name: terraform apply
+      # `shell: bash` throughout, for pipefail: without it `tee` would swallow a
+      # failing terraform and the step would pass. Each layer is its own log
+      # file, which is what the summary below reads back.
+      - name: Apply every layer, in order
         shell: bash
-        run: terraform apply -auto-approve -no-color | tee "$RUNNER_TEMP/apply.log"
+        run: |
+          export TF_PLUGIN_CACHE_DIR="$RUNNER_TEMP/tf-plugin-cache"
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
+          for dir in infra/terraform/[0-9][0-9]-*/; do
+            layer=$(basename "$dir")
+            echo "::group::$layer — init and validate"
+            terraform -chdir="$dir" init -no-color
+            terraform -chdir="$dir" validate -no-color
+            echo "::endgroup::"
+            echo "::group::$layer — apply"
+            terraform -chdir="$dir" apply -auto-approve -no-color \
+              | tee "$RUNNER_TEMP/$layer.apply.log"
+            echo "::endgroup::"
+          done
 
-      # The emulator is created and destroyed with the job, so a destroy only
-      # means anything in the same job that applied. On its own it would meet an
-      # empty emulator, find nothing to remove and report zero destroyed —
-      # true, and no demonstration of anything. Here it tears down the six
-      # resources the step above just created, and the workspace goes 6 -> 0.
-      - name: Destroy what was just applied
+      # Reverse order, because a layer cannot go before what depends on it. The
+      # emulator is created and destroyed with the job, so a destroy only means
+      # anything in the same job that applied: on its own it would meet an empty
+      # emulator, find nothing to remove and report zero destroyed.
+      - name: Destroy every layer, in reverse
         if: inputs.destroy
         shell: bash
-        run: terraform destroy -auto-approve -no-color | tee "$RUNNER_TEMP/destroy.log"
+        run: |
+          mapfile -t dirs < <(printf '%s\n' infra/terraform/[0-9][0-9]-*/ | sort -r)
+          for dir in "${dirs[@]}"; do
+            layer=$(basename "$dir")
+            echo "::group::$layer — destroy"
+            terraform -chdir="$dir" destroy -auto-approve -no-color \
+              | tee "$RUNNER_TEMP/$layer.destroy.log"
+            echo "::endgroup::"
+          done
 
       # Two places to look is one too many. The run's own page gets the outcome
       # and a link into HCP Terraform, where the plan and apply are readable
@@ -169,27 +191,26 @@ jobs:
           # summary, and the step after reads it back to comment.
           summary="$RUNNER_TEMP/summary.md"
           : > "$summary"
-          summarise() {
-            local title="$1" log="$2" result url
-            [ -f "$log" ] || return 0
-            result=$(grep -aoE '(Apply|Destroy) complete! Resources:.*' "$log" | tail -1 || true)
-            url=$(grep -aoE 'https://app\.terraform\.io/app/[^ ]+/runs/run-[A-Za-z0-9]+' "$log" | tail -1 || true)
+          shopt -s nullglob
+          logs=("$RUNNER_TEMP"/*.apply.log "$RUNNER_TEMP"/*.destroy.log)
+          shopt -u nullglob
+          if [ ${#logs[@]} -gt 0 ]; then
             {
-              echo "### Terraform — $title"
-              echo
-              echo "| | |"
-              echo "| --- | --- |"
-              echo "| Result | ${result:-did not complete} |"
-              if [ -n "$url" ]; then
-                echo "| HCP run | [${url##*/}]($url) |"
-              else
-                echo "| HCP run | [twitter-clone workspace](https://app.terraform.io/app/JDSG-Group6/workspaces/twitter-clone/runs) |"
-              fi
-              echo
+              echo "| Layer | Action | Result | HCP run |"
+              echo "| --- | --- | --- | --- |"
+              for log in "${logs[@]}"; do
+                base=$(basename "$log" .log)
+                result=$(grep -aoE '(Apply|Destroy) complete! Resources:.*' "$log" | tail -1 || true)
+                url=$(grep -aoE 'https://app\.terraform\.io/app/[^ ]+/runs/run-[A-Za-z0-9]+' "$log" | tail -1 || true)
+                if [ -n "$url" ]; then
+                  link="[${url##*/}]($url)"
+                else
+                  link="—"
+                fi
+                echo "| \`${base%.*}\` | ${base##*.} | ${result:-did not complete} | $link |"
+              done
             } >> "$summary"
-          }
-          summarise apply "$RUNNER_TEMP/apply.log"
-          summarise destroy "$RUNNER_TEMP/destroy.log"
+          fi
           cat "$summary" >> "$GITHUB_STEP_SUMMARY"
 
       # The same panel, on the pull request, edited in place rather than added
