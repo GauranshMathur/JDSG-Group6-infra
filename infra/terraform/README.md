@@ -14,15 +14,18 @@ be building on subnets that exist only in another layer's state.
 
 ## Layers
 
-| Layer | Workspace | Holds | Status |
-| --- | --- | --- | --- |
-| `00-foundation` | `twitter-clone-foundation` | KMS keys, media bucket | applied |
-| `10-network` | `twitter-clone-network` | VPCs, subnets, gateways, routing, NACLs, security groups, transit gateway | scaffolded, empty |
-| `20-edge` | `twitter-clone-edge` | ACM, NLB, ALB, WAF, Route 53 | not started |
-| `30-platform` | `twitter-clone-platform` | ECR, IAM, SSM | not started |
-| `40-data` | `twitter-clone-data` | RDS | not started |
-| `50-cluster` | `twitter-clone-cluster` | EKS, node groups | not started |
-| `60-reliability` | `twitter-clone-reliability` | Backup, S3 replication, failover | not started |
+**The workspace is named after the directory** — `10-network` the directory writes state to
+`10-network` the workspace. One rule, nothing to look up.
+
+| Layer / workspace | Holds | Status |
+| --- | --- | --- |
+| `00-foundation` | KMS keys, media bucket | applied |
+| `10-network` | VPCs, subnets, gateways, routing, NACLs, security groups, transit gateway | scaffolded, empty |
+| `20-edge` | ACM, NLB, ALB, WAF, Route 53 | not started |
+| `30-platform` | ECR, IAM, SSM | not started |
+| `40-data` | RDS | not started |
+| `50-cluster` | EKS, node groups | not started |
+| `60-reliability` | Backup, S3 replication, failover | not started |
 
 Layers below `60` are planned, not promised — see [decisions.md](../../docs/decisions.md).
 
@@ -65,7 +68,7 @@ must have remote state sharing enabled in HCP Terraform, or the read is denied.
 
 ## Adding a layer
 
-1. Create the workspace in HCP Terraform, CLI-driven.
+1. Create the workspace in HCP Terraform, CLI-driven, **named exactly like the directory**.
 2. Set **Execution mode: Agent** against the `jdsg` pool, and **Terraform version 1.13.1**.
 3. Enable **remote state sharing** if a layer above will read its outputs.
 4. Create the directory with the scaffolding files above; copy `.terraform.lock.hcl` from a

@@ -103,7 +103,7 @@ nothing" is the whole of what the check claims.
 
 One root became seven. Every directory under `infra/terraform/` matching `NN-name` is its
 own Terraform root with its own workspace and state, applied in directory order by the
-workflow. **Modules are still refused** — the reversal is about roots, not about
+workflow. The workspace is named after the directory, so there is nothing to look up. **Modules are still refused** — the reversal is about roots, not about
 indirection.
 
 The reason is readability. A single root grows to ~125 resources across the full design,

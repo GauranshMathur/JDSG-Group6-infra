@@ -51,8 +51,8 @@ One-time setup, in the HCP Terraform organization named in each layer's `cloud.t
 `TF_CLOUD_ORGANIZATION`):
 
 1. Create an agent pool and an agent token.
-2. Create a workspace per layer — `twitter-clone-foundation`, `twitter-clone-network`, … —
-   each **Execution mode: Agent** against that pool. See
+2. Create a workspace per layer, named after its directory — `00-foundation`,
+   `10-network`, … — each **Execution mode: Agent** against that pool. See
    [`infra/terraform/README.md`](infra/terraform/README.md).
 3. Add two repository secrets — `TF_API_TOKEN` (a user or team token, for the CLI) and
    `TFC_AGENT_TOKEN` (the agent token). A pull request from a fork gets neither, so the

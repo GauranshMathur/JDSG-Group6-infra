@@ -122,11 +122,17 @@ jobs:
             hashicorp/tfc-agent:latest
 
       - name: Wait for the agent to register
+        env:
+          TFC_AGENT_NAME: ci-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           set -euo pipefail
           for _ in $(seq 1 60); do
             if docker logs tfc-agent 2>&1 | grep -qi 'registered'; then
-              echo "Agent registered with HCP Terraform."
+              # Named in the log so a run in HCP Terraform can be matched to the
+              # agent that executed it. A run taken by any other agent in the
+              # pool cannot reach this job's emulator.
+              echo "Agent '$TFC_AGENT_NAME' registered with HCP Terraform."
+              docker logs tfc-agent 2>&1 | grep -i 'registered' | tail -1
               exit 0
             fi
             if [ "$(docker inspect -f '{{.State.Running}}' tfc-agent)" != "true" ]; then
@@ -139,6 +145,19 @@ jobs:
           echo "::error::the agent did not register within 120s"
           docker logs tfc-agent
           exit 1
+
+      # The apply reaches floci on 127.0.0.1 only because the agent shares the
+      # runner's network namespace. Assert it here rather than discovering it
+      # fifty seconds into an apply as nine retries and a connection refused.
+      - name: Check the agent shares the runner's network
+        run: |
+          set -euo pipefail
+          mode=$(docker inspect tfc-agent --format '{{.HostConfig.NetworkMode}}')
+          echo "agent network mode: $mode"
+          if [ "$mode" != "host" ]; then
+            echo "::error::the agent is on network '$mode', not host, so it cannot reach floci on 127.0.0.1"
+            exit 1
+          fi
 
       - run: terraform fmt -check -recursive -no-color infra/terraform
 
