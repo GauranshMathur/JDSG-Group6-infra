@@ -62,6 +62,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Fail in two seconds with the reason, rather than thirty seconds later
+      # inside a container that says only "token is required".
+      - name: Check the HCP Terraform secrets are set
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          TFC_AGENT_TOKEN: ${{ secrets.TFC_AGENT_TOKEN }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "$TF_API_TOKEN" ] || missing="$missing TF_API_TOKEN"
+          [ -n "$TFC_AGENT_TOKEN" ] || missing="$missing TFC_AGENT_TOKEN"
+          if [ -n "$missing" ]; then
+            echo "::error::missing repository secret(s):$missing — see the README. A pull request from a fork never has them."
+            exit 1
+          fi
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.13.1
