@@ -220,6 +220,11 @@ jobs:
               for log in "${logs[@]}"; do
                 base=$(basename "$log" .log)
                 result=$(grep -aoE '(Apply|Destroy) complete! Resources:.*' "$log" | tail -1 || true)
+                # A layer with nothing to do prints "No changes" and never the
+                # "Apply complete!" line, which is a success, not a silence.
+                if [ -z "$result" ] && grep -qaE 'No changes\.|Planned and finished' "$log"; then
+                  result="No changes"
+                fi
                 url=$(grep -aoE 'https://app\.terraform\.io/app/[^ ]+/runs/run-[A-Za-z0-9]+' "$log" | tail -1 || true)
                 if [ -n "$url" ]; then
                   link="[${url##*/}]($url)"
