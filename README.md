@@ -28,21 +28,35 @@ infra/
 ├── terraform/        # The reference design as Terraform, verified in CI against floci
 ├── kubernetes/       # Manifests, cluster-agnostic (not started yet)
 └── docker/           # Compose files: the emulator, and PostgreSQL for local dev
-.github/workflows/    # CI (lint + security scan), Terraform (apply against floci), diagram render
+.github/workflows/    # CI (lint + security scan), Terraform (HCP Terraform run against floci), diagram render
 docs/                 # The three documents above, plus the diagram source
 ```
 
 ## Running things
 
+**Terraform is never run by hand.** State, locking and run history live in
+[HCP Terraform](docs/decisions.md), and the `Terraform` workflow is the only thing that
+applies this configuration: it starts a throwaway floci on the runner, starts an agent
+beside it, and dispatches the run. To see a plan and an apply, push a change under
+`infra/terraform/`.
+
+One-time setup, in the HCP Terraform organization named in `infra/terraform/cloud.tf` (or
+set `TF_CLOUD_ORGANIZATION`):
+
+1. Create an agent pool and an agent token.
+2. Create the `twitter-clone` workspace, **Execution mode: Agent**, against that pool.
+3. Add two repository secrets — `TF_API_TOKEN` (a user or team token, for the CLI) and
+   `TFC_AGENT_TOKEN` (the agent token). A pull request from a fork gets neither, so the
+   Terraform check cannot run on one.
+
+Locally there is only the runtime, never Terraform:
+
 ```bash
-# The local AWS emulator
-docker compose -f infra/docker/floci-compose.yml up -d
-
-# Apply the Terraform against it (same thing CI does)
-cd infra/terraform && terraform init && terraform apply
-
 # PostgreSQL, for when the app moves off SQLite
 docker compose -f infra/docker/app-compose.yml up -d
+
+# The AWS emulator, if you want one to poke at by hand
+docker compose -f infra/docker/floci-compose.yml up -d
 ```
 
 ## What's next

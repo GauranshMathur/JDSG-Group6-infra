@@ -54,6 +54,7 @@ durably stored nothing. Now: local state (gitignored), and the `Terraform` check
 with a throwaway emulator, an apply is free and side-effect-free, and a green check means
 "this configuration stands up from nothing". Cost: none of the production state/backend
 patterns are demonstrated here; if that lesson is ever wanted, it is a decision away.
+**Reversed on 2026-09-08** — the lesson was wanted; see the entry below.
 
 ## 2026-08-18 — The NLB fronts the ALB
 
@@ -68,6 +69,34 @@ balancer on the applied path, which against floci is roughly another minute of a
 `ci.yml` scans the whole tree (secrets, vulnerable dependencies, misconfiguration) and
 fails on any fixable HIGH or CRITICAL. Do not weaken it to make a build pass; if a finding
 is genuinely not actionable, say so in the PR.
+
+## 2026-09-08 — State and runs move to HCP Terraform, on a self-hosted agent
+
+The reversal the 2026-08-18 entry left open. State, locking and run history live in HCP
+Terraform, in one workspace, `twitter-clone`. Terraform is never run by hand — the
+`Terraform` workflow is the only thing that applies this configuration, which is why one
+workspace is enough and why there is no local path to keep in step with it.
+
+Runs execute on a **self-hosted agent** rather than HashiCorp's own workers, because a
+worker in HashiCorp's cloud has no route to the floci the job starts on the runner, and
+putting a fake AWS on the public internet to give it one is not on the table. The workflow
+starts the agent beside the emulator and stops it at the end of the job, so the single
+agent the free tier allows is only ever in use while a run is.
+
+This does not touch "never a real AWS account" — HCP Terraform is not AWS, and nothing here
+bills or provisions. It does make HCP Terraform the first external service the project
+depends on besides GitHub and GHCR.
+
+Cost. The check now needs two repository secrets, so a pull request from a fork cannot run
+it. The job grows an agent container and a registration wait on top of the emulator it
+already had. And there is no way to apply this configuration except through the pipeline —
+which is the intent, but it does mean a broken workflow is a broken apply, with no manual
+fallback.
+
+Not a cost, and written down so nobody later mistakes it for one: the workspace's state
+outlives the emulator it describes, so every plan reads as a first-time create. Nothing
+here needs a resource to survive a run. The pipeline is the artifact, and "stands up from
+nothing" is the whole of what the check claims.
 
 ---
 
