@@ -164,6 +164,11 @@ jobs:
         if: always()
         shell: bash
         run: |
+          # GITHUB_STEP_SUMMARY is a different file in every step, so the panel
+          # is built in a real file first: this step appends it to its own
+          # summary, and the step after reads it back to comment.
+          summary="$RUNNER_TEMP/summary.md"
+          : > "$summary"
           summarise() {
             local title="$1" log="$2" result url
             [ -f "$log" ] || return 0
@@ -181,10 +186,11 @@ jobs:
                 echo "| HCP run | [twitter-clone workspace](https://app.terraform.io/app/JDSG-Group6/workspaces/twitter-clone/runs) |"
               fi
               echo
-            } >> "$GITHUB_STEP_SUMMARY"
+            } >> "$summary"
           }
           summarise apply "$RUNNER_TEMP/apply.log"
           summarise destroy "$RUNNER_TEMP/destroy.log"
+          cat "$summary" >> "$GITHUB_STEP_SUMMARY"
 
       # The same panel, on the pull request, edited in place rather than added
       # to on every push. --create-if-none is recent; the fallback covers a
@@ -196,9 +202,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.number }}
         run: |
-          [ -s "$GITHUB_STEP_SUMMARY" ] || exit 0
-          gh pr comment "$PR" --body-file "$GITHUB_STEP_SUMMARY" --edit-last --create-if-none \
-            || gh pr comment "$PR" --body-file "$GITHUB_STEP_SUMMARY"
+          summary="$RUNNER_TEMP/summary.md"
+          [ -s "$summary" ] || { echo "::warning::no summary was produced"; exit 0; }
+          gh pr comment "$PR" --body-file "$summary" --edit-last --create-if-none \
+            || gh pr comment "$PR" --body-file "$summary"
 
       # SIGTERM, so the agent deregisters instead of leaving a dead entry
       # occupying the one agent the free tier allows.
