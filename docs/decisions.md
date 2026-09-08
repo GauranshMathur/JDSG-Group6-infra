@@ -87,13 +87,16 @@ This does not touch "never a real AWS account" — HCP Terraform is not AWS, and
 here bills or provisions. It does make HCP Terraform the first external service the
 project depends on besides GitHub and GHCR.
 
-Cost, and there is a lot of it. `terraform init` now needs the network and a token, so
-there is no offline path and a pull request from a fork cannot run the Terraform check at
-all. The free tier allows one agent at a time, so a local agent left running starves a CI
-run — stop it when you are done. CI's state is durable while its emulator is not, so every
-plan there reads as a first-time create; the check still means "this stands up from
-nothing", it just says it through a workspace that outlives what it describes. And the job
-grows an agent container and a registration wait, on top of the emulator it already had.
+Cost. `terraform init` now needs the network and a token, so there is no offline path and
+a pull request from a fork cannot run the Terraform check at all. The free tier allows one
+agent at a time, so a local agent left running starves a CI run — stop it when you are
+done. And the job grows an agent container and a registration wait, on top of the emulator
+it already had.
+
+Not a cost, and written down so nobody later mistakes it for one: CI's state outlives the
+emulator it describes, so every plan there reads as a first-time create. Nothing here
+needs a resource to survive a run. The pipeline is the artifact, and "stands up from
+nothing" is the whole of what the check claims.
 
 ---
 
