@@ -15,8 +15,8 @@
 
 terraform {
   cloud {
-    # TF_CLOUD_ORGANIZATION overrides this if the organization is named otherwise.
-    organization = "jdsg-group6"
+    # TF_CLOUD_ORGANIZATION overrides this. The name is case-sensitive.
+    organization = "JDSG-Group6"
 
     workspaces {
       name = "twitter-clone"
