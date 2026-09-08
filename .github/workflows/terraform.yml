@@ -24,6 +24,16 @@ on:
     paths:
       - "infra/terraform/**"
       - ".github/workflows/terraform.yml"
+  # Run it by hand from the Actions tab. The only way to start a run at all:
+  # the workspace executes on an agent, and the only agent that ever exists is
+  # the one this job starts, so a run queued from the HCP Terraform UI waits
+  # for an agent that never arrives.
+  workflow_dispatch:
+    inputs:
+      destroy:
+        description: "Destroy the resources after applying them, in the same job"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -130,6 +140,15 @@ jobs:
       - run: terraform init -no-color
       - run: terraform validate -no-color
       - run: terraform apply -auto-approve -no-color
+
+      # The emulator is created and destroyed with the job, so a destroy only
+      # means anything in the same job that applied. On its own it would meet an
+      # empty emulator, find nothing to remove and report zero destroyed —
+      # true, and no demonstration of anything. Here it tears down the six
+      # resources the step above just created, and the workspace goes 6 -> 0.
+      - name: Destroy what was just applied
+        if: inputs.destroy
+        run: terraform destroy -auto-approve -no-color
 
       # SIGTERM, so the agent deregisters instead of leaving a dead entry
       # occupying the one agent the free tier allows.

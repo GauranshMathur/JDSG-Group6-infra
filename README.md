@@ -38,7 +38,13 @@ docs/                 # The three documents above, plus the diagram source
 [HCP Terraform](docs/decisions.md), and the `Terraform` workflow is the only thing that
 applies this configuration: it starts a throwaway floci on the runner, starts an agent
 beside it, and dispatches the run. To see a plan and an apply, push a change under
-`infra/terraform/`.
+`infra/terraform/`, or run the workflow by hand from the **Actions** tab — which also
+takes a `destroy` option that tears the resources down again in the same job, so the
+workspace goes 6 resources to 0 and back.
+
+Do not queue a run from the HCP Terraform UI. It will wait forever: the workspace executes
+on an agent, and the only agent that ever exists is the one the job starts and stops around
+the run.
 
 One-time setup, in the HCP Terraform organization named in `infra/terraform/cloud.tf` (or
 set `TF_CLOUD_ORGANIZATION`):
