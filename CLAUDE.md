@@ -44,6 +44,8 @@ Docs: [docs/architecture.md](docs/architecture.md) (the design),
   imperative, lowercase, no trailing period.
 - All work reaches `main` through a pull request on a `type/<short-description>` branch —
   never commit to `main` directly, never use an environment-assigned branch name.
+- **One layer, one pull request.** A layer under `infra/terraform/` is built, reviewed and
+  merged on its own before the next one starts. Do not fill two layers on one branch.
 - Run what CI runs before pushing (`terraform fmt/validate/plan`, compose config).
 
 ## Agent skills

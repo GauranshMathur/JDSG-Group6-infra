@@ -78,6 +78,11 @@ must have remote state sharing enabled in HCP Terraform, or the read is denied.
 
 ## Adding a layer
 
+**One layer, one pull request.** A layer is built, reviewed and merged before the next one
+starts — the numbering is the dependency order, and a branch that fills two of them is
+reviewing neither.
+
+
 1. Create the workspace in HCP Terraform, CLI-driven, named `twitter-clone-NN` for the
    directory's prefix. Create it **before** the first init — see the warning above.
 2. Set **Execution mode: Agent** against the `jdsg` pool, and **Terraform version 1.13.1**.
