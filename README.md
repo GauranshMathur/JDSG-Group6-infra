@@ -28,18 +28,44 @@ infra/
 ├── terraform/        # The reference design as Terraform, verified in CI against floci
 ├── kubernetes/       # Manifests, cluster-agnostic (not started yet)
 └── docker/           # Compose files: the emulator, and PostgreSQL for local dev
-.github/workflows/    # CI (lint + security scan), Terraform (apply against floci), diagram render
+.github/workflows/    # CI (lint + security scan), Terraform (HCP Terraform run against floci), diagram render
 docs/                 # The three documents above, plus the diagram source
 ```
 
 ## Running things
 
+Terraform state and run history live in [HCP Terraform](docs/decisions.md), and the runs
+execute on a self-hosted agent standing next to the emulator — HashiCorp's workers cannot
+reach a floci on localhost. So there is a one-time setup before the first apply.
+
+**One-time, in HCP Terraform.** In the organization named in `infra/terraform/cloud.tf`
+(or set `TF_CLOUD_ORGANIZATION`):
+
+1. Create an agent pool and an agent token.
+2. Create two workspaces, both tagged `twitter-clone`, both **Execution mode: Agent**
+   against that pool — `twitter-clone-local` and `twitter-clone-ci`.
+3. `terraform login`, or export `TF_TOKEN_app_terraform_io`.
+4. For CI, add two repository secrets: `TF_API_TOKEN` (a user or team token) and
+   `TFC_AGENT_TOKEN` (the agent token). Without them the Terraform check cannot run,
+   which is also why it cannot run on a pull request from a fork.
+
+**Then, to apply locally:**
+
 ```bash
 # The local AWS emulator
 docker compose -f infra/docker/floci-compose.yml up -d
 
-# Apply the Terraform against it (same thing CI does)
-cd infra/terraform && terraform init && terraform apply
+# The agent that runs Terraform against it. Host networking, so it reaches
+# the same localhost:4566 the provider defaults to.
+docker run -d --name tfc-agent --network host \
+  -e TFC_AGENT_TOKEN -e TFC_AGENT_NAME=local hashicorp/tfc-agent:latest
+
+# Apply. TF_WORKSPACE picks the workspace; the run happens on the agent.
+cd infra/terraform && TF_WORKSPACE=twitter-clone-local terraform init && terraform apply
+
+# Stop the agent when you are done — the free tier allows one at a time, and
+# leaving this one up will starve a CI run.
+docker stop tfc-agent && docker rm tfc-agent
 
 # PostgreSQL, for when the app moves off SQLite
 docker compose -f infra/docker/app-compose.yml up -d

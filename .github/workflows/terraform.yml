@@ -1,9 +1,17 @@
 name: Terraform
 
-# The reference design applied against a fresh floci emulator. State is local
-# and thrown away with the runner, so the apply is free and side-effect-free —
-# a green check means this configuration stands up from nothing. There is no
-# real AWS account anywhere in this.
+# The reference design applied against a fresh floci emulator, driven by HCP
+# Terraform. The run is dispatched to a self-hosted agent started here in the
+# job: HashiCorp's own workers cannot reach the emulator on localhost, and this
+# one can. State lives in the `twitter-clone-ci` workspace and outlives the
+# emulator that the resources were created in, so every plan here reads as a
+# first-time create — the check still means "this configuration stands up from
+# nothing", it just says it through a durable workspace. There is no real AWS
+# account anywhere in this.
+#
+# Needs two repository secrets, so a pull request from a fork cannot run it:
+#   TF_API_TOKEN      a user or team token — authenticates the CLI
+#   TFC_AGENT_TOKEN   an agent pool token — authenticates the agent
 on:
   pull_request:
     paths:
@@ -19,9 +27,17 @@ on:
 permissions:
   contents: read
 
+# One workspace and one agent slot, so two runs at once would queue behind each
+# other in HCP Terraform anyway. Serialize here instead, where it is visible.
+concurrency:
+  group: terraform
+  cancel-in-progress: false
+
 env:
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
+  TF_WORKSPACE: twitter-clone-ci
+  TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
   AWS_ACCESS_KEY_ID: test
   AWS_SECRET_ACCESS_KEY: test
   AWS_DEFAULT_REGION: us-east-1
@@ -64,7 +80,51 @@ jobs:
           echo "::error::floci did not answer on :4566"
           exit 1
 
+      # Host networking, so the agent reaches the emulator on the same
+      # localhost:4566 that var.endpoint defaults to. The token is passed
+      # through the environment rather than on the command line.
+      - name: Start the HCP Terraform agent
+        env:
+          TFC_AGENT_TOKEN: ${{ secrets.TFC_AGENT_TOKEN }}
+          TFC_AGENT_NAME: ci-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          docker run --detach --name tfc-agent --network host \
+            --env TFC_AGENT_TOKEN \
+            --env TFC_AGENT_NAME \
+            hashicorp/tfc-agent:latest
+
+      - name: Wait for the agent to register
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 60); do
+            if docker logs tfc-agent 2>&1 | grep -qi 'registered'; then
+              echo "Agent registered with HCP Terraform."
+              exit 0
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' tfc-agent)" != "true" ]; then
+              echo "::error::the agent exited before registering"
+              docker logs tfc-agent
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "::error::the agent did not register within 120s"
+          docker logs tfc-agent
+          exit 1
+
       - run: terraform fmt -check -recursive -no-color
       - run: terraform init -no-color
       - run: terraform validate -no-color
       - run: terraform apply -auto-approve -no-color
+
+      # SIGTERM, so the agent deregisters instead of leaving a dead entry
+      # occupying the one free-tier agent slot.
+      - name: Stop the agent
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -n "$(docker ps -aq --filter 'name=^tfc-agent$')" ]; then
+            docker stop --timeout 30 tfc-agent >/dev/null
+            docker rm tfc-agent >/dev/null
+          fi

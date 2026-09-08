@@ -54,6 +54,7 @@ durably stored nothing. Now: local state (gitignored), and the `Terraform` check
 with a throwaway emulator, an apply is free and side-effect-free, and a green check means
 "this configuration stands up from nothing". Cost: none of the production state/backend
 patterns are demonstrated here; if that lesson is ever wanted, it is a decision away.
+**Reversed on 2026-09-08** — the lesson was wanted; see the entry below.
 
 ## 2026-08-18 — The NLB fronts the ALB
 
@@ -68,6 +69,31 @@ balancer on the applied path, which against floci is roughly another minute of a
 `ci.yml` scans the whole tree (secrets, vulnerable dependencies, misconfiguration) and
 fails on any fixable HIGH or CRITICAL. Do not weaken it to make a build pass; if a finding
 is genuinely not actionable, say so in the PR.
+
+## 2026-09-08 — State and runs move to HCP Terraform, on a self-hosted agent
+
+The reversal the 2026-08-18 entry left open. State, locking and run history live in HCP
+Terraform. Runs execute on a **self-hosted agent** rather than HashiCorp's own workers,
+because a worker in HashiCorp's cloud has no route to a floci on localhost, and putting a
+fake AWS on the public internet to give it one is not on the table. The agent runs beside
+the emulator — in the CI job, or next to `floci-compose.yml` locally — and reaches it on
+the same `localhost:4566` the provider already defaults to.
+
+Two workspaces, both Agent execution, selected by `TF_WORKSPACE`:
+`twitter-clone-local` against the persistent emulator, where state accumulates and an
+incremental apply means something, and `twitter-clone-ci` against the throwaway one.
+
+This does not touch "never a real AWS account" — HCP Terraform is not AWS, and nothing
+here bills or provisions. It does make HCP Terraform the first external service the
+project depends on besides GitHub and GHCR.
+
+Cost, and there is a lot of it. `terraform init` now needs the network and a token, so
+there is no offline path and a pull request from a fork cannot run the Terraform check at
+all. The free tier allows one agent at a time, so a local agent left running starves a CI
+run — stop it when you are done. CI's state is durable while its emulator is not, so every
+plan there reads as a first-time create; the check still means "this stands up from
+nothing", it just says it through a workspace that outlives what it describes. And the job
+grows an agent container and a registration wait, on top of the emulator it already had.
 
 ---
 
