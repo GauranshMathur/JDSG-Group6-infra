@@ -34,41 +34,29 @@ docs/                 # The three documents above, plus the diagram source
 
 ## Running things
 
-Terraform state and run history live in [HCP Terraform](docs/decisions.md), and the runs
-execute on a self-hosted agent standing next to the emulator — HashiCorp's workers cannot
-reach a floci on localhost. So there is a one-time setup before the first apply.
+**Terraform is never run by hand.** State, locking and run history live in
+[HCP Terraform](docs/decisions.md), and the `Terraform` workflow is the only thing that
+applies this configuration: it starts a throwaway floci on the runner, starts an agent
+beside it, and dispatches the run. To see a plan and an apply, push a change under
+`infra/terraform/`.
 
-**One-time, in HCP Terraform.** In the organization named in `infra/terraform/cloud.tf`
-(or set `TF_CLOUD_ORGANIZATION`):
+One-time setup, in the HCP Terraform organization named in `infra/terraform/cloud.tf` (or
+set `TF_CLOUD_ORGANIZATION`):
 
 1. Create an agent pool and an agent token.
-2. Create two workspaces, both tagged `twitter-clone`, both **Execution mode: Agent**
-   against that pool — `twitter-clone-local` and `twitter-clone-ci`.
-3. `terraform login`, or export `TF_TOKEN_app_terraform_io`.
-4. For CI, add two repository secrets: `TF_API_TOKEN` (a user or team token) and
-   `TFC_AGENT_TOKEN` (the agent token). Without them the Terraform check cannot run,
-   which is also why it cannot run on a pull request from a fork.
+2. Create the `twitter-clone` workspace, **Execution mode: Agent**, against that pool.
+3. Add two repository secrets — `TF_API_TOKEN` (a user or team token, for the CLI) and
+   `TFC_AGENT_TOKEN` (the agent token). A pull request from a fork gets neither, so the
+   Terraform check cannot run on one.
 
-**Then, to apply locally:**
+Locally there is only the runtime, never Terraform:
 
 ```bash
-# The local AWS emulator
-docker compose -f infra/docker/floci-compose.yml up -d
-
-# The agent that runs Terraform against it. Host networking, so it reaches
-# the same localhost:4566 the provider defaults to.
-docker run -d --name tfc-agent --network host \
-  -e TFC_AGENT_TOKEN -e TFC_AGENT_NAME=local hashicorp/tfc-agent:latest
-
-# Apply. TF_WORKSPACE picks the workspace; the run happens on the agent.
-cd infra/terraform && TF_WORKSPACE=twitter-clone-local terraform init && terraform apply
-
-# Stop the agent when you are done — the free tier allows one at a time, and
-# leaving this one up will starve a CI run.
-docker stop tfc-agent && docker rm tfc-agent
-
 # PostgreSQL, for when the app moves off SQLite
 docker compose -f infra/docker/app-compose.yml up -d
+
+# The AWS emulator, if you want one to poke at by hand
+docker compose -f infra/docker/floci-compose.yml up -d
 ```
 
 ## What's next

@@ -1,13 +1,14 @@
 name: Terraform
 
 # The reference design applied against a fresh floci emulator, driven by HCP
-# Terraform. The run is dispatched to a self-hosted agent started here in the
-# job: HashiCorp's own workers cannot reach the emulator on localhost, and this
-# one can. State lives in the `twitter-clone-ci` workspace and outlives the
-# emulator that the resources were created in, so every plan here reads as a
-# first-time create — the check still means "this configuration stands up from
-# nothing", it just says it through a durable workspace. There is no real AWS
-# account anywhere in this.
+# Terraform. This workflow is the only thing that applies the configuration —
+# nothing is run by hand — and the run is dispatched to a self-hosted agent
+# started here in the job, because HashiCorp's own workers cannot reach an
+# emulator on the runner's localhost and this agent can. State outlives the
+# emulator the resources were created in, so every plan reads as a first-time
+# create: "this configuration stands up from nothing" is the whole claim. There
+# is no real AWS account anywhere in this, and the provider's credentials are
+# the fake ones hardcoded in providers.tf.
 #
 # Needs two repository secrets, so a pull request from a fork cannot run it:
 #   TF_API_TOKEN      a user or team token — authenticates the CLI
@@ -27,8 +28,8 @@ on:
 permissions:
   contents: read
 
-# One workspace and one agent slot, so two runs at once would queue behind each
-# other in HCP Terraform anyway. Serialize here instead, where it is visible.
+# One workspace and one agent, so two runs at once would queue behind each other
+# in HCP Terraform anyway. Serialize here instead, where it is visible.
 concurrency:
   group: terraform
   cancel-in-progress: false
@@ -36,11 +37,7 @@ concurrency:
 env:
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
-  TF_WORKSPACE: twitter-clone-ci
   TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
-  AWS_ACCESS_KEY_ID: test
-  AWS_SECRET_ACCESS_KEY: test
-  AWS_DEFAULT_REGION: us-east-1
 
 jobs:
   terraform:
@@ -119,7 +116,7 @@ jobs:
       - run: terraform apply -auto-approve -no-color
 
       # SIGTERM, so the agent deregisters instead of leaving a dead entry
-      # occupying the one free-tier agent slot.
+      # occupying the one agent the free tier allows.
       - name: Stop the agent
         if: always()
         run: |

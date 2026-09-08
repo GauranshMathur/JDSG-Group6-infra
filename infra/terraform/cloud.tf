@@ -1,26 +1,17 @@
-# State, locking and run history live in HCP Terraform. Runs execute on a
-# self-hosted agent rather than HashiCorp's own workers, because a worker in
-# HashiCorp's cloud has no route to a floci on localhost and putting a fake AWS
-# on the public internet is not on the table. The agent runs beside the
-# emulator and reaches it exactly as a local `terraform apply` would.
+# State, locking and run history live in HCP Terraform. Terraform is never run
+# by hand here: the `Terraform` workflow is the only thing that applies this
+# configuration, which is why one workspace is enough and why there is no local
+# path to keep in step with it.
 #
-# Two workspaces, selected by TF_WORKSPACE, because they mean different things:
+# Runs execute on a self-hosted agent rather than HashiCorp's own workers,
+# because a worker in HashiCorp's cloud has no route to the floci the job starts
+# on the runner, and putting a fake AWS on the public internet to give it one is
+# not on the table. The workflow starts the agent beside the emulator, where it
+# reaches it on the same localhost:4566 the provider already defaults to.
 #
-#   twitter-clone-local   the persistent floci from infra/docker/floci-compose.yml,
-#                         where state accumulates and an incremental apply means
-#                         something
-#   twitter-clone-ci      the throwaway emulator in terraform.yml, wiped with the
-#                         runner. Its state describes nothing between runs, so
-#                         every plan there reads as a first-time create — which
-#                         is the check working, not the check broken
-#
-# Both must exist before the first init and both must be set to Agent execution
-# against the same pool; neither is expressible here, so see the README. The
-# free tier allows one agent at a time, so a local agent left running will
-# starve a CI run.
-#
-# `terraform init` now needs the network and a token — `terraform login`, or
-# TF_TOKEN_app_terraform_io. There is no offline path any more.
+# The workspace must exist before the first init, and must be set to Agent
+# execution against the pool that issued TFC_AGENT_TOKEN. Neither is expressible
+# here — see the README.
 
 terraform {
   cloud {
@@ -28,7 +19,7 @@ terraform {
     organization = "jdsg-group6"
 
     workspaces {
-      tags = ["twitter-clone"]
+      name = "twitter-clone"
     }
   }
 }
