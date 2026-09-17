@@ -7,3 +7,8 @@ output "s3_kms_alias" {
   description = "The customer-managed key encrypting S3 objects."
   value       = aws_kms_alias.s3.name
 }
+
+output "ecr_repository_url" {
+  description = "The app image repository the reference design names. The cluster pulls from GHCR, not this."
+  value       = aws_ecr_repository.app.repository_url
+}

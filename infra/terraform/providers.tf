@@ -13,6 +13,7 @@ provider "aws" {
   s3_use_path_style           = true
 
   endpoints {
+    ecr = var.endpoint
     kms = var.endpoint
     s3  = var.endpoint
     sts = var.endpoint
