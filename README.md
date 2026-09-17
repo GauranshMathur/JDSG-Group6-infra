@@ -32,6 +32,8 @@ infra/
 docs/                 # The three documents above, plus the diagram source
 ```
 
+CLAUDE.md at the repo root carries the agent-facing conventions for working in this repository.
+
 ## Running things
 
 **Terraform is never run by hand.** State, locking and run history live in
