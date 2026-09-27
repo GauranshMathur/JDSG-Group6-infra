@@ -119,3 +119,10 @@ above. The issue is where the arguing happens; this file is where the answer liv
 - **Load-test tooling** — k6 and Toxiproxy are the candidates, and the app repository
   already has a k6 suite worth reusing. Decide when load testing starts —
   [#25](https://github.com/GauranshMathur/JDSG-Group6-infra/issues/25).
+- **Should a pull request apply into the shared workspace?** Every run — on any branch —
+  applies into the one workspace, so a pull request that is closed rather than merged leaves
+  its resources in state with no configuration to match. That happened on 2026-09-17 and
+  broke every plan afterwards, including on `main`, because the orphan's service had no
+  endpoint and the refresh went to real AWS. Options: plan-only on pull requests and apply
+  only on `main`, or a workspace per branch. Decide before the next layer doubles the number
+  of workspaces.
