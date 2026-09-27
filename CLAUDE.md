@@ -30,8 +30,9 @@ Docs: [docs/architecture.md](docs/architecture.md) (the design),
   current work needs.
 - When a decision is genuinely open, ask rather than guessing; open items live at the
   bottom of `docs/decisions.md`.
-- One root, no modules; Terraform files split by concern; Kubernetes objects are
-  manifests, never `kubernetes` provider resources. Never commit state.
+- Layered roots under `infra/terraform/` applied in directory order, no modules; files
+  split by concern inside each layer — see `infra/terraform/README.md`. Kubernetes objects
+  are manifests, never `kubernetes` provider resources. Never commit state.
 - Manifests stay cluster-agnostic — no EKS-only storage classes, no ALB annotations.
 - No application code here; it belongs in the app repository.
 - Do not weaken a CI security gate to make a build pass. If a finding is genuinely not
@@ -43,6 +44,8 @@ Docs: [docs/architecture.md](docs/architecture.md) (the design),
   imperative, lowercase, no trailing period.
 - All work reaches `main` through a pull request on a `type/<short-description>` branch —
   never commit to `main` directly, never use an environment-assigned branch name.
+- **One layer, one pull request.** A layer under `infra/terraform/` is built, reviewed and
+  merged on its own before the next one starts. Do not fill two layers on one branch.
 - Run what CI runs before pushing (`terraform fmt/validate/plan`, compose config).
 
 ## Agent skills

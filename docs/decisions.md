@@ -18,6 +18,7 @@ quotas, IAM edge cases, managed-service failure modes — stays unproven, perman
 There is one of everything, so modules would add indirection without reuse. Files split by
 concern (`s3.tf`, `eks.tf`, …). Kubernetes objects are manifests, never `kubernetes`
 provider resources — the provider cannot plan against a cluster that does not exist yet.
+**The single root was reversed on 2026-09-27** — see the entry below. No modules still holds.
 
 ## 2026-08-05 — Images come from GHCR
 
@@ -97,6 +98,37 @@ Not a cost, and written down so nobody later mistakes it for one: the workspace'
 outlives the emulator it describes, so every plan reads as a first-time create. Nothing
 here needs a resource to survive a run. The pipeline is the artifact, and "stands up from
 nothing" is the whole of what the check claims.
+
+## 2026-09-27 — Layered roots, applied in directory order
+
+One root becomes one per layer. Every directory under `infra/terraform/` matching `NN-name`
+is its own Terraform root with its own workspace and state, applied in directory order by
+the workflow, which globs `[0-9][0-9]-*/` rather than listing them. Each writes to
+`twitter-clone-NN` for its directory prefix. **Modules are still refused** — the reversal is
+about roots, not about indirection.
+
+The reason is readability. A single root grows to roughly 125 resources across the full
+design, and a `network.tf` holding thirty of them is not reviewable. Separate roots also
+give a plan and an apply per layer in HCP Terraform, and force each layer to declare in
+`outputs.tf` what the layers above may depend on, rather than reaching into anything.
+
+**All layers apply in one CI job**, because they must share one emulator: floci is created
+and destroyed with the job, so a second job would get an empty one and a layer would build
+on subnets that exist only in another layer's state. Ordering is the directory prefix;
+destroy runs the same list backwards.
+
+Cost, and it is not small. Seven workspaces to create and configure by hand as the layers
+land, each needing Agent execution — and a workspace whose name does not exist yet is
+created by `terraform init` with **Remote** execution, which cannot reach the emulator, so a
+typo silently produces a run that dies on `connection refused`. `versions.tf`, `cloud.tf`
+and `providers.tf` duplicate into every layer — around twenty near-identical short files,
+because Terraform has no include. Each root is a separate HCP run, so the pipeline pays
+upload, queue and plan overhead per layer: roughly five extra minutes once all seven exist,
+against a thirty-minute job timeout. And a layer can only read another layer through
+`terraform_remote_state`, a coupling a single root did not have.
+
+This lands one layer at a time. `00-foundation` is the move itself and nothing else: the
+same six resources, the same workspace, a new path and a workflow that iterates.
 
 ---
 
