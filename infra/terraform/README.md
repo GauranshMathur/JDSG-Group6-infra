@@ -20,7 +20,7 @@ will write its state to `twitter-clone-10`.
 | Layer | Workspace | Holds | Status |
 | --- | --- | --- | --- |
 | `00-foundation` | `twitter-clone-00` | KMS keys — and nothing else | applied |
-| `10-network` | `twitter-clone-10` | VPCs, subnets, gateways, routing, NACLs, security groups, transit gateway | VPCs applied |
+| `10-network` | `twitter-clone-10` | VPCs, subnets, gateways, routing, NACLs, security groups, transit gateway | VPCs and subnets applied |
 | `20-edge` | `twitter-clone-20` | ACM, NLB, ALB, WAF, Route 53 | not started |
 | `30-platform` | `twitter-clone-30` | ECR, IAM, SSM | not started |
 | `40-data` | `twitter-clone-40` | Media bucket, and RDS when it lands | media bucket applied |
@@ -29,8 +29,9 @@ will write its state to `twitter-clone-10`.
 
 `00-foundation`, `10-network` and `40-data` exist. Foundation holds keys and nothing else;
 anything the application stores lives with the data layer, beside where the database will,
-rather than under a name that only ever meant "built first". `10-network` holds the three VPCs
-and nothing inside them yet. The other rows are the intended order, not a promise — see
+rather than under a name that only ever meant "built first". `10-network` holds the three VPCs,
+two public subnets in the perimeter and two private ones in the application VPC — no
+gateways or routing yet. The other rows are the intended order, not a promise — see
 [decisions.md](../../docs/decisions.md).
 
 > **A typo here does not fail — it creates.** If `cloud.tf` names a workspace that does not
