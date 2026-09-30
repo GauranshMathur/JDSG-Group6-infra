@@ -20,14 +20,15 @@ will write its state to `twitter-clone-10`.
 | Layer | Workspace | Holds | Status |
 | --- | --- | --- | --- |
 | `00-foundation` | `twitter-clone-00` | KMS keys, and the media bucket until the data layer exists | applied |
-| `10-network` | `twitter-clone-10` | VPCs, subnets, gateways, routing, NACLs, security groups, transit gateway | not started |
+| `10-network` | `twitter-clone-10` | VPCs, subnets, gateways, routing, NACLs, security groups, transit gateway | VPCs applied |
 | `20-edge` | `twitter-clone-20` | ACM, NLB, ALB, WAF, Route 53 | not started |
 | `30-platform` | `twitter-clone-30` | ECR, IAM, SSM | not started |
 | `40-data` | `twitter-clone-40` | Media bucket, and RDS when it lands | not started |
 | `50-cluster` | `twitter-clone-50` | EKS, node groups | not started |
 | `60-reliability` | `twitter-clone-60` | Backup, S3 replication, failover | not started |
 
-Only `00-foundation` exists. The rows below it are the intended order, not a promise — see
+`00-foundation` and `10-network` exist; `10-network` holds the three VPCs and nothing inside
+them yet. The rows below are the intended order, not a promise — see
 [decisions.md](../../docs/decisions.md). The media bucket sits in foundation for now because
 that is where it already was; it belongs with the data layer and moves there when `40-data`
 is built, since "built first" is not a category that anything stores data in.
@@ -61,6 +62,12 @@ twice is a file that wants splitting.
 **The endpoints block is an inventory.** `providers.tf` lists an endpoint per AWS service
 the root touches. Add a service, add its endpoint — otherwise the provider aims at real AWS
 and fails on the fake credentials.
+
+**Inert resources carry a tag.** Most of this design applies against floci and then does
+nothing: the emulator routes no packet and enforces no rule. Those resources carry
+`local.inert` (`Emulation = "inert"`), so a security group in state is never mistaken for one
+that filters traffic. A tag rather than a comment deliberately — it survives into state and
+shows up wherever the resource is read.
 
 **No modules.** There is one of everything, so a module would add indirection without reuse,
 and it would hide the cross-references that the file split exists to make findable.
