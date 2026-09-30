@@ -92,6 +92,54 @@ jobs:
             exit 1
           fi
 
+      # Before anything runs init, because init is what does the damage. A layer
+      # whose cloud.tf names a workspace that does not exist has it created, on
+      # Remote execution, and the run dies on HashiCorp's workers with no emulator
+      # to reach. A layer copied from a neighbour that still names the
+      # neighbour's workspace fails nothing at all: it writes its state over the
+      # other layer's. Both are checked here in seconds, from the API, rather than
+      # found minutes into an apply — or never.
+      - name: Check every layer's workspace
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          fail=0
+          for dir in infra/terraform/[0-9][0-9]-*/; do
+            layer=$(basename "$dir")
+            want="twitter-clone-${layer:0:2}"
+            org=$(sed -nE 's/^[[:space:]]*organization[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$dir/cloud.tf")
+            got=$(sed -nE 's/^[[:space:]]*name[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$dir/cloud.tf")
+            if [ "$got" != "$want" ]; then
+              echo "::error file=${dir}cloud.tf::$layer names workspace '${got:-<none>}', but its prefix means '$want'"
+              fail=1
+              continue
+            fi
+            # --fail is not used: a 404 is an answer, not a transport error.
+            code=$(curl -sS -o "$RUNNER_TEMP/ws.json" -w '%{http_code}' \
+              -H "Authorization: Bearer $TF_API_TOKEN" \
+              -H "Content-Type: application/vnd.api+json" \
+              "https://app.terraform.io/api/v2/organizations/$org/workspaces/$want")
+            if [ "$code" = 404 ]; then
+              echo "::error::$layer: workspace '$want' does not exist in '$org'. Create it on Agent execution before this runs — init would create it on Remote execution, which cannot reach floci."
+              fail=1
+              continue
+            fi
+            if [ "$code" != 200 ]; then
+              echo "::error::$layer: HCP Terraform answered $code for workspace '$want'"
+              fail=1
+              continue
+            fi
+            mode=$(jq -r '.data.attributes["execution-mode"]' "$RUNNER_TEMP/ws.json")
+            if [ "$mode" != agent ]; then
+              echo "::error::$layer: workspace '$want' is on '$mode' execution, not agent, so its run cannot reach floci"
+              fail=1
+              continue
+            fi
+            echo "$layer -> $want (agent execution)"
+          done
+          exit "$fail"
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.13.1
