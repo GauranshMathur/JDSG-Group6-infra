@@ -19,19 +19,19 @@ will write its state to `twitter-clone-10`.
 
 | Layer | Workspace | Holds | Status |
 | --- | --- | --- | --- |
-| `00-foundation` | `twitter-clone-00` | KMS keys, and the media bucket until the data layer exists | applied |
+| `00-foundation` | `twitter-clone-00` | KMS keys — and nothing else | applied |
 | `10-network` | `twitter-clone-10` | VPCs, subnets, gateways, routing, NACLs, security groups, transit gateway | VPCs applied |
 | `20-edge` | `twitter-clone-20` | ACM, NLB, ALB, WAF, Route 53 | not started |
 | `30-platform` | `twitter-clone-30` | ECR, IAM, SSM | not started |
-| `40-data` | `twitter-clone-40` | Media bucket, and RDS when it lands | not started |
+| `40-data` | `twitter-clone-40` | Media bucket, and RDS when it lands | media bucket applied |
 | `50-cluster` | `twitter-clone-50` | EKS, node groups | not started |
 | `60-reliability` | `twitter-clone-60` | Backup, S3 replication, failover | not started |
 
-`00-foundation` and `10-network` exist; `10-network` holds the three VPCs and nothing inside
-them yet. The rows below are the intended order, not a promise — see
-[decisions.md](../../docs/decisions.md). The media bucket sits in foundation for now because
-that is where it already was; it belongs with the data layer and moves there when `40-data`
-is built, since "built first" is not a category that anything stores data in.
+`00-foundation`, `10-network` and `40-data` exist. Foundation holds keys and nothing else;
+anything the application stores lives with the data layer, beside where the database will,
+rather than under a name that only ever meant "built first". `10-network` holds the three VPCs
+and nothing inside them yet. The other rows are the intended order, not a promise — see
+[decisions.md](../../docs/decisions.md).
 
 > **A typo here does not fail — it creates.** If `cloud.tf` names a workspace that does not
 > exist, `terraform init` creates it, and a workspace created that way defaults to **Remote**
@@ -72,9 +72,14 @@ shows up wherever the resource is read.
 **No modules.** There is one of everything, so a module would add indirection without reuse,
 and it would hide the cross-references that the file split exists to make findable.
 
-**Cross-layer references go through outputs.** A layer declares in `outputs.tf` what it
-exposes; the layer above reads it with `terraform_remote_state`. The producing workspace
-must have remote state sharing enabled in HCP Terraform, or the read is denied.
+**Cross-layer references, two ways.** A layer declares in `outputs.tf` what it exposes.
+Where the thing has a stable public name — a KMS alias, a VPC tag — prefer a **data source
+lookup** against the emulator: it needs nothing configured in HCP Terraform, and it works
+because layers apply in order in one job, so the lower layer's resource already exists.
+`40-data` finds its key this way, by `alias/twitter-clone-s3`. Where there is no such name,
+read the output with `terraform_remote_state`, and enable remote state sharing on the
+producing workspace or the read is denied. The lookup's cost is a weaker contract — it
+depends on a string, so renaming it below breaks the layer above at plan time, not review.
 
 ## Adding a layer
 
