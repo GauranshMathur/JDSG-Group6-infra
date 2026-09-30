@@ -38,6 +38,11 @@ and nothing inside them yet. The other rows are the intended order, not a promis
 > execution. The run then executes on HashiCorp's workers, which have no floci on their
 > loopback, and the apply dies with `connection refused` after nine retries. Three runs were
 > lost to exactly this. Check the name, and check the execution mode of anything new.
+>
+> The workflow now checks both before any `init`: each layer's workspace must match its
+> directory prefix, exist, and be on Agent execution. The prefix check also catches the quieter
+> mistake — a layer copied from a neighbour that still names the neighbour's workspace, which
+> fails nothing and writes its state over the other layer's.
 
 ## Inside a layer
 
