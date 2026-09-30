@@ -130,6 +130,20 @@ against a thirty-minute job timeout. And a layer can only read another layer thr
 This lands one layer at a time. `00-foundation` is the move itself and nothing else: the
 same six resources, the same workspace, a new path and a workflow that iterates.
 
+## 2026-09-30 — Layers find each other by name where they can
+
+`40-data` needs `00-foundation`'s KMS key. It resolves it with a `data "aws_kms_alias"`
+lookup against the emulator, not with `terraform_remote_state`. The lookup needs nothing
+configured in HCP Terraform — remote state sharing is a per-workspace setting that has to be
+switched on by hand and cannot be checked from here — and it works because the workflow
+applies `00` before `40` in the same job, so the alias already exists when the data layer
+plans. `terraform_remote_state` stays the answer where there is no stable name to look up.
+
+Cost: a weaker contract. An output is declared and reviewed; a lookup depends on a string.
+Rename the alias in foundation and the data layer breaks at plan time, not at review. And a
+lookup reads the live emulator, so it only works inside the one job that applies both
+layers — which is the only way anything here is ever applied.
+
 ---
 
 ## Undecided

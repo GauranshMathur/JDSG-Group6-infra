@@ -21,6 +21,11 @@ provider "aws" {
   # entry, and nothing recreates it because nothing declares it. The line stays
   # afterwards: ECR is in the reference design, and a missing endpoint is how a
   # request reaches Amazon.
+  # s3 is here, like ecr, for resources this root no longer declares. The media
+  # bucket moved to 40-data, but this workspace's state still holds its four
+  # resources until one run drains them. Without the endpoint, that refresh would
+  # go to real AWS and fail the plan; pointed at floci, it finds nothing and the
+  # entries drop. Both lines can go once state no longer mentions either service.
   endpoints {
     ecr = var.endpoint
     kms = var.endpoint

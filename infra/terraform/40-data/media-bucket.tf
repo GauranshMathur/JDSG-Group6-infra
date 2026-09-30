@@ -1,20 +1,12 @@
 # Media storage — the bucket Active Storage moves to when the app leaves
-# pod-local disk. Encrypted with a customer-managed key because the reference
-# design says KMS encrypts S3, and because the Trivy gate refuses an
+# pod-local disk. Application state, which is why it lives here beside where the
+# database will, rather than in the foundation layer under a name that only ever
+# meant "built first". Encrypted with a customer-managed key because the
+# reference design says KMS encrypts S3, and because the Trivy gate refuses an
 # unencrypted bucket.
 
-resource "aws_kms_key" "s3" {
-  description         = "Encrypts S3 objects for twitter-clone"
-  enable_key_rotation = true
-}
-
-resource "aws_kms_alias" "s3" {
-  name          = "alias/twitter-clone-s3"
-  target_key_id = aws_kms_key.s3.key_id
-}
-
 resource "aws_s3_bucket" "media" {
-  bucket = "twitter-clone-media"
+  bucket = "${local.name_prefix}-media"
 }
 
 resource "aws_s3_bucket_versioning" "media" {
@@ -31,7 +23,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "media" {
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm     = "aws:kms"
-      kms_master_key_id = aws_kms_key.s3.arn
+      kms_master_key_id = data.aws_kms_alias.s3.target_key_arn
     }
   }
 }
