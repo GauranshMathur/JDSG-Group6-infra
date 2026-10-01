@@ -35,3 +35,8 @@ output "perimeter_nat_gateway_ids" {
   description = "NAT gateway id by availability zone, in the perimeter's public subnets."
   value       = { for az, nat in aws_nat_gateway.perimeter : az => nat.id }
 }
+
+output "transit_gateway_id" {
+  description = "The transit gateway joining the perimeter and application VPCs."
+  value       = aws_ec2_transit_gateway.this.id
+}
