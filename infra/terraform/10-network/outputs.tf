@@ -20,3 +20,13 @@ output "application_private_subnet_ids" {
   description = "Private subnet id by availability zone, in the application VPC."
   value       = { for az, subnet in aws_subnet.application_private : az => subnet.id }
 }
+
+output "perimeter_internet_gateway_id" {
+  description = "The perimeter VPC's internet gateway — the design's only one."
+  value       = aws_internet_gateway.perimeter.id
+}
+
+output "perimeter_public_route_table_id" {
+  description = "Route table shared by the perimeter's public subnets."
+  value       = aws_route_table.perimeter_public.id
+}

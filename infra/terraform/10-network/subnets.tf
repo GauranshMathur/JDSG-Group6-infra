@@ -13,9 +13,8 @@ locals {
 # firewall endpoints — a handful of interfaces each — so 251 usable addresses is
 # ample, and the rest of 10.0.0.0/16 stays free for what the edge adds later.
 #
-# "Public" is the role, not yet the fact: nothing routes to an internet gateway
-# until the gateway and its route table land. And map_public_ip_on_launch stays
-# off. Nothing here launches instances that want one — NAT takes an Elastic IP
+# "Public" because route-tables.tf sends their traffic out through the internet
+# gateway. And map_public_ip_on_launch stays off. Nothing here launches instances that want one — NAT takes an Elastic IP
 # and load balancers manage their own — and Trivy's gate rightly refuses a
 # subnet that hands public addresses out by default.
 resource "aws_subnet" "perimeter_public" {
