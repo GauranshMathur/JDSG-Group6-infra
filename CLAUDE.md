@@ -42,10 +42,16 @@ Docs: [docs/architecture.md](docs/architecture.md) (the design),
 
 - [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): subject`,
   imperative, lowercase, no trailing period.
-- All work reaches `main` through a pull request on a `type/<short-description>` branch —
-  never commit to `main` directly, never use an environment-assigned branch name.
-- **One layer, one pull request.** A layer under `infra/terraform/` is built, reviewed and
-  merged on its own before the next one starts. Do not fill two layers on one branch.
+- All work reaches `main` through a pull request — never commit to `main` directly, never
+  use an environment-assigned branch name.
+- **A layer is changed only from a branch named exactly for its workspace** —
+  `twitter-clone-10` for `10-network`, nothing before or after it, and never `feat/...`.
+  One layer per branch, one branch per workspace at a time: the name is the lock, and it
+  frees when the branch is deleted on merge. Only these branches (and `main`) apply.
+- Everything else — CI, docs, anything outside a layer — goes on a
+  `type/<short-description>` branch (`ci/...`, `docs/...`, `fix/...`) and gets no apply
+  on its pull request.
+- The `Terraform policy` check enforces both rules on every pull request.
 - Run what CI runs before pushing (`terraform fmt/validate/plan`, compose config).
 
 ## Agent skills

@@ -89,10 +89,28 @@ depends on a string, so renaming it below breaks the layer above at plan time, n
 
 ## Adding a layer
 
-**One layer, one pull request.** A layer is built, reviewed and merged before the next one
-starts — the numbering is the dependency order, and a branch that fills two of them is
-reviewing neither.
+**One layer, one pull request, from a branch named for its workspace.** A change to
+`10-network` is made on a branch called exactly `twitter-clone-10`. A layer is built,
+reviewed and merged before the next one starts — the numbering is the dependency order, and
+a branch that fills two of them is reviewing neither. Because a branch name can exist only
+once, each workspace has at most one change in flight, and the name frees when the branch is
+deleted on merge.
 
+The `Terraform policy` check holds this on every pull request:
+
+| Branch | Layers it changes | Result |
+| --- | --- | --- |
+| `twitter-clone-NN` | exactly `NN-*` | applies |
+| `twitter-clone-NN` | none, another, or more than one | refused |
+| anything else (`ci/…`, `docs/…`) | none | passes, no apply |
+| anything else, `feat/…` included | any | refused |
+
+A push to `main` applies, and so does a run by hand from `main` or a `twitter-clone-NN`
+branch — from nowhere else. Applies run one at a time across the repository, since every run
+applies every layer into its shared workspace. Shared files — the workflow, this README — go
+on a `ci/` or `docs/` branch, and their first apply is the push to `main` after merge.
+
+0. Branch from `main` as `twitter-clone-NN`, for the new layer's prefix.
 1. Create the workspace in HCP Terraform, CLI-driven, named `twitter-clone-NN` for the
    directory's prefix. Create it **before** the first init — see the warning above.
 2. Set **Execution mode: Agent** against the `jdsg` pool, and **Terraform version 1.13.1**.

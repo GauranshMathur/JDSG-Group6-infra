@@ -144,6 +144,23 @@ Rename the alias in foundation and the data layer breaks at plan time, not at re
 lookup reads the live emulator, so it only works inside the one job that applies both
 layers — which is the only way anything here is ever applied.
 
+## 2026-10-01 — A layer's branch is named for its workspace
+
+A change to a layer comes from a branch named exactly for that layer's workspace —
+`twitter-clone-10` for `10-network` — one layer per branch. Branches are no longer named for
+the feature. Because a branch name exists only once, a workspace has at most one change in
+flight, which is the point: no two pull requests take turns writing different configurations
+into the same workspace. The `Terraform policy` job holds it on every pull request, and applies
+come only from those branches, a push to `main`, or a run by hand from either. Everything else
+— CI, docs — keeps `type/<short-description>` and gets no apply on its pull request. Applies
+run one at a time across the repository, locked on the apply job rather than the workflow.
+
+Cost. A workflow change can no longer be proven by an apply before it merges: its pull request
+runs the policy and nothing else, and the first apply under the new workflow is the push to
+`main`. Local checks against stubs have to carry that weight. Two changes to the same layer
+cannot be prepared side by side; the second waits for the first to merge. And the lock is a
+check, not a wall, until `protect-main` requires it — the ruleset requires no status checks yet.
+
 ---
 
 ## Undecided
@@ -165,10 +182,7 @@ above. The issue is where the arguing happens; this file is where the answer liv
 - **Load-test tooling** — k6 and Toxiproxy are the candidates, and the app repository
   already has a k6 suite worth reusing. Decide when load testing starts —
   [#25](https://github.com/GauranshMathur/JDSG-Group6-infra/issues/25).
-- **Should a pull request apply into the shared workspace?** Every run — on any branch —
-  applies into the one workspace, so a pull request that is closed rather than merged leaves
-  its resources in state with no configuration to match. That happened on 2026-09-17 and
-  broke every plan afterwards, including on `main`, because the orphan's service had no
-  endpoint and the refresh went to real AWS. Options: plan-only on pull requests and apply
-  only on `main`, or a workspace per branch. Decide before the next layer doubles the number
-  of workspaces.
+- **Should a pull request apply into the shared workspace at all?** Narrowed on 2026-10-01:
+  only a branch named for a workspace applies, and only one per workspace at a time. Still
+  open: such a branch closed rather than merged leaves its state ahead of `main`, as #35 did
+  in 2026-09. Plan-only on pull requests, with apply on `main`, would close it.

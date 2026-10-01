@@ -38,11 +38,11 @@ docs/                 # The three documents above, plus the diagram source
 **Terraform is never run by hand.** State, locking and run history live in
 [HCP Terraform](docs/decisions.md), and the `Terraform` workflow is the only thing that
 applies this configuration: it starts a throwaway floci on the runner, starts an agent
-beside it, and dispatches the run. To see a plan and an apply, push a change under
-any layer under `infra/terraform/`, or run the workflow by hand from the **Actions** tab —
-which also
-takes a `destroy` option that tears the resources down again in the same job, so the
-workspace goes 6 resources to 0 and back.
+beside it, and dispatches the run. To see a plan and an apply, open a pull request that
+changes one layer from a branch named for its workspace — `twitter-clone-10` for
+`10-network` — or run the workflow by hand on `main` from the **Actions** tab, which also
+takes a `destroy` option that tears every layer down again, in reverse, in the same job.
+Branch rules are in [`infra/terraform/README.md`](infra/terraform/README.md).
 
 Do not queue a run from the HCP Terraform UI. It will wait forever: the workspace executes
 on an agent, and the only agent that ever exists is the one the job starts and stops around
