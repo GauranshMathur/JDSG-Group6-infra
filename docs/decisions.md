@@ -161,6 +161,27 @@ runs the policy and nothing else, and the first apply under the new workflow is 
 cannot be prepared side by side; the second waits for the first to merge. And the lock is a
 check, not a wall, until `protect-main` requires it — the ruleset requires no status checks yet.
 
+## 2026-10-01 — Security groups in the network layer; open rules designed out first
+
+Every security group in the design — load balancers, cluster nodes, the database — is defined
+in `10-network`, and the layers that create those things attach them. One file holds every
+rule, so what may talk to what is reviewed in one place. Cost: network defines groups before
+anything uses them, every rule change is a `twitter-clone-10` change, and an upper layer finds
+its group by lookup.
+
+Trivy refuses any rule open to `0.0.0.0/0`, and the gate stays as it is. Open rules are
+designed out where the design allows: the NLB takes HTTPS only from CloudFront's origin-facing
+managed prefix list, which is what "nothing behind the perimeter sees the internet directly"
+means. floci has no AWS-managed lists and refuses the reserved name for any other, so the
+lookup's name is a variable defaulting to AWS's own; the workflow seeds a stand-in with a
+documentation range as its one entry and points the layer at it through a generated
+`emulator.auto.tfvars`. Network ACLs stay at the VPC default rather than declaring a public ACL that must
+admit return traffic from anywhere. What can't be designed out gets an inline exception naming
+one check on one resource, with the reason above it. There is one: nodes out to the internet on
+443, for image pulls from GHCR (no stable range to narrow to) and for AWS APIs through NAT.
+Cost: every exception is a rule the scanner no longer reads, so each one has to be argued in
+review instead.
+
 ---
 
 ## Undecided
