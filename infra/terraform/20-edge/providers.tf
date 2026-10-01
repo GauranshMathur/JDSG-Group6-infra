@@ -14,6 +14,8 @@ provider "aws" {
 
   endpoints {
     acm     = var.endpoint
+    ec2     = var.endpoint
+    elbv2   = var.endpoint
     route53 = var.endpoint
     sts     = var.endpoint
   }

@@ -47,8 +47,10 @@ or out crosses the transit gateway. NAT carries cluster-started egress only. A D
 gateway and reaches the **NLB** first: the L4 entry point, which gives the perimeter a
 fixed-address front door and hands the connection on without inspecting it. The NLB
 forwards to the **ALB**, which does the L7 work — host and path routing, TLS from ACM, and
-the OIDC sign-in hop against Cognito in the reference design. The ALB is created and kept
-in sync by the AWS Load Balancer Controller from the Kubernetes `Ingress`.
+the OIDC sign-in hop against Cognito in the reference design. The ALB, its listener and the
+app's target group are defined in Terraform; the AWS Load Balancer Controller registers the
+app's pods into that target group through a `TargetGroupBinding`, rather than creating a load
+balancer from an `Ingress`.
 
 Locally neither forwards a packet, since floci emulates both at the API level only. The
 NLB's job is the one that survives: k3s's ServiceLB does real L4, and Traefik plays the

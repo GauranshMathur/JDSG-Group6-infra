@@ -33,6 +33,9 @@ From two throwaway spikes, since deleted (Actions runs 31680455895 and 316843347
   (`InvalidParameterValue`). The Terraform workflow's "Seed what the emulator lacks" step
   creates a stand-in under its own name and points the layer at it with a generated
   `emulator.auto.tfvars`; the variable defaults to AWS's real name.
+- **ACM certificates issue under DNS validation.** A certificate for a `.test` name, with its
+  validation record in a Route 53 zone floci also holds, reaches `ISSUED` and
+  `aws_acm_certificate_validation` completes (2026-10-01). No real delegation is involved.
 - **Placement groups are refused** (`UnsupportedOperation`, HTTP 400) — an enabled service
   is not a complete service. Nothing in the design needs one.
 - **Unimplemented operations fail loudly** — 404 for an absent service, 400 for a missing
