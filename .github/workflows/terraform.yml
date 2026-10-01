@@ -104,9 +104,13 @@ jobs:
               refuse "a run by hand applies only from main or a twitter-clone-NN branch, not from $REF_NAME" ;;
           esac
 
+          # A plain assignment, not inside the process substitution below: there a
+          # failed diff would yield no layers and wave a layer change through. Here
+          # set -e stops the job, so the gate fails closed.
           # --no-renames: a file moved from one layer to another touches both, and
           # rename detection would report only where it landed.
-          mapfile -t layers < <(git diff --name-only --no-renames HEAD^1 HEAD \
+          changed=$(git diff --name-only --no-renames HEAD^1 HEAD)
+          mapfile -t layers < <(printf '%s\n' "$changed" \
             | sed -nE 's#^infra/terraform/([0-9]{2}-[^/]+)/.*#\1#p' | sort -u)
 
           if [[ "$HEAD_REF" =~ $workspace_branch ]]; then
