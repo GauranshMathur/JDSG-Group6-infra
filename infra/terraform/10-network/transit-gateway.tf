@@ -1,8 +1,8 @@
 # The transit gateway joining the perimeter and application VPCs. The design's
 # centralized egress: the application VPC has no internet gateway, so anything
 # it sends out crosses here to the perimeter, through a NAT gateway, and out the
-# internet gateway. This file is the fabric; the VPC route tables that send
-# traffic into it are their own change.
+# internet gateway. This file is the fabric; the VPC routes that send traffic
+# into it are in route-tables.tf.
 #
 # The DR VPC is not attached. It joins over inter-region peering in the design,
 # and floci has no regions to peer between, so that stays on paper.

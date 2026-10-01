@@ -40,3 +40,8 @@ output "transit_gateway_id" {
   description = "The transit gateway joining the perimeter and application VPCs."
   value       = aws_ec2_transit_gateway.this.id
 }
+
+output "application_private_route_table_id" {
+  description = "Route table for the application VPC's private subnets: everything to the transit gateway."
+  value       = aws_route_table.application_private.id
+}
