@@ -17,14 +17,21 @@ name: Terraform
 # whole claim. There is no real AWS account anywhere in this, and the provider's
 # credentials are the fake ones hardcoded in each root's providers.tf.
 #
+# Applies come from three places only: a push to main, a pull request from a
+# branch named exactly for the workspace it changes (twitter-clone-10 for
+# 10-network), and a run by hand from one of those. The policy job decides,
+# on every pull request, and fails anything else that touches a layer.
+#
 # Needs two repository secrets, so a pull request from a fork cannot run it:
 #   TF_API_TOKEN      a user or team token — authenticates the CLI
 #   TFC_AGENT_TOKEN   an agent pool token — authenticates the agent
 on:
+  # Every pull request, not only Terraform ones: the policy check has to report
+  # on all of them to be usable as a required check, or a pull request that
+  # never touches Terraform would wait forever for a check that never comes.
+  # The policy job does the path filtering itself, and nothing expensive starts
+  # unless it says apply.
   pull_request:
-    paths:
-      - "infra/terraform/**"
-      - ".github/workflows/terraform.yml"
   push:
     branches:
       - main
@@ -46,22 +53,98 @@ permissions:
   contents: read
   pull-requests: write
 
-# One agent, and layers that must apply in order, so two pipelines at once would
-# interleave. Serialize here, where it is visible.
-concurrency:
-  group: terraform
-  cancel-in-progress: false
-
 env:
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
   TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
 
 jobs:
+  # Which branch may apply what. A layer is changed only from a branch named
+  # exactly for its workspace, one layer per branch — so a workspace can have one
+  # branch in flight at a time, the name itself is the lock, and it frees when
+  # the branch is deleted on merge. Cheap and service-free, so it can run on
+  # every pull request.
+  policy:
+    name: Terraform policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Runs on every pull request and only reads the diff.
+    permissions:
+      contents: read
+    outputs:
+      apply: ${{ steps.decide.outputs.apply }}
+    steps:
+      # Depth 2: on a pull request the checkout is the merge commit, whose first
+      # parent is the base, so HEAD^1..HEAD is exactly what the pull request changes.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Decide
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          verdict() { echo "apply=$1" >> "$GITHUB_OUTPUT"; echo "$2" | tee -a "$GITHUB_STEP_SUMMARY"; }
+          refuse() { echo "::error::$1"; echo "**Refused:** $1" >> "$GITHUB_STEP_SUMMARY"; exit 1; }
+          workspace_branch='^twitter-clone-([0-9]{2})$'
+
+          case "$EVENT" in
+            push)
+              verdict true "Push to main: applies."
+              exit 0 ;;
+            workflow_dispatch)
+              if [ "$REF_NAME" = main ] || [[ "$REF_NAME" =~ $workspace_branch ]]; then
+                verdict true "Run by hand on $REF_NAME: applies."
+                exit 0
+              fi
+              refuse "a run by hand applies only from main or a twitter-clone-NN branch, not from $REF_NAME" ;;
+          esac
+
+          # --no-renames: a file moved from one layer to another touches both, and
+          # rename detection would report only where it landed.
+          mapfile -t layers < <(git diff --name-only --no-renames HEAD^1 HEAD \
+            | sed -nE 's#^infra/terraform/([0-9]{2}-[^/]+)/.*#\1#p' | sort -u)
+
+          if [[ "$HEAD_REF" =~ $workspace_branch ]]; then
+            nn="${BASH_REMATCH[1]}"
+            shopt -s nullglob
+            dirs=(infra/terraform/"$nn"-*/)
+            shopt -u nullglob
+            [ "${#dirs[@]}" -eq 1 ] \
+              || refuse "branch $HEAD_REF names workspace $nn, but there is no single layer infra/terraform/$nn-*/"
+            want=$(basename "${dirs[0]}")
+            if [ "${#layers[@]}" -ne 1 ] || [ "${layers[0]}" != "$want" ]; then
+              refuse "branch $HEAD_REF may change $want and no other layer, and must change it; this pull request changes: ${layers[*]:-no layer}"
+            fi
+            verdict true "Branch $HEAD_REF changes $want: applies."
+            exit 0
+          fi
+
+          if [ "${#layers[@]}" -gt 0 ]; then
+            refuse "this pull request changes ${layers[*]}, from branch $HEAD_REF. A layer is changed only from a branch named for its workspace — twitter-clone-NN, one layer per branch — never feat/ or any other name."
+          fi
+          verdict false "Branch $HEAD_REF changes no layer: no apply."
+
   terraform:
     name: Terraform
+    needs: policy
+    if: needs.policy.outputs.apply == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
+    # One apply at a time, across the whole repository: there is one agent, and
+    # every run applies every layer into its shared workspace. On this job rather
+    # than the workflow, so the policy check on an unrelated pull request never
+    # queues behind an apply or bumps a waiting one out. A running apply is never
+    # cancelled — that would leave a workspace locked mid-apply. GitHub keeps one
+    # waiting run per group, so a newer one replaces an older one still waiting.
+    concurrency:
+      group: terraform-apply
+      cancel-in-progress: false
 
     # No Docker socket here: EKS applies in mock mode.
     services:
