@@ -28,9 +28,11 @@ From two throwaway spikes, since deleted (Actions runs 31680455895 and 316843347
   segfaults reading the response back — identically on 4.67, 5.0, 5.31, 5.70, 6.0 and
   6.59. Not a regression; no pin escapes it. `plan` handles it fine; only `apply` dies.
 - **No AWS-managed prefix lists.** Looking up `com.amazonaws.global.cloudfront.origin-facing`
-  fails with `no matching EC2 Managed Prefix List found` (2026-10-01). The Terraform workflow
-  seeds a stand-in under that name before applying — its "Seed what the emulator lacks" step —
-  so the configuration keeps the lookup that works on real AWS.
+  fails with `no matching EC2 Managed Prefix List found` (2026-10-01). And, like AWS, floci
+  refuses to create any list whose name begins `com.amazonaws.`, `com.amazon.` or `com.aws.`
+  (`InvalidParameterValue`). The Terraform workflow's "Seed what the emulator lacks" step
+  creates a stand-in under its own name and points the layer at it with a generated
+  `emulator.auto.tfvars`; the variable defaults to AWS's real name.
 - **Placement groups are refused** (`UnsupportedOperation`, HTTP 400) — an enabled service
   is not a complete service. Nothing in the design needs one.
 - **Unimplemented operations fail loudly** — 404 for an absent service, 400 for a missing

@@ -246,11 +246,14 @@ jobs:
           exit 1
 
       # floci serves no AWS-managed prefix lists, and 10-network's NLB rule looks
-      # up CloudFront's by name — the same lookup that works unchanged on real
-      # AWS. Create a list under that name here, standing in for what AWS itself
-      # provides, so the Terraform carries no emulator-only branch. Its one entry
-      # is a documentation range (RFC 5737), not CloudFront's: floci filters
-      # nothing, and a copy of AWS's ranges would only go stale.
+      # up CloudFront's. On real AWS the lookup finds AWS's own list, by the name
+      # the variable defaults to. floci refuses that name — as AWS does, the
+      # com.amazonaws. prefix is reserved — so the stand-in gets its own, and an
+      # emulator.auto.tfvars, generated here and never committed, points each
+      # layer that declares the variable at it. HCP Terraform uploads
+      # *.auto.tfvars with the configuration. The one entry is a documentation
+      # range (RFC 5737), not CloudFront's: floci filters nothing, and a copy of
+      # AWS's ranges would only go stale.
       #
       # AWS_ENDPOINT_URL as well as --endpoint-url, so every call in this step
       # goes to the emulator even if a flag is ever dropped. The credentials are
@@ -261,22 +264,30 @@ jobs:
           AWS_ACCESS_KEY_ID: test
           AWS_SECRET_ACCESS_KEY: test
           AWS_DEFAULT_REGION: us-east-1
-          PREFIX_LIST: com.amazonaws.global.cloudfront.origin-facing
+          STANDIN: twitter-clone-cloudfront-origin-standin
         run: |
           set -euo pipefail
           aws --endpoint-url "$AWS_ENDPOINT_URL" ec2 create-managed-prefix-list \
-            --prefix-list-name "$PREFIX_LIST" --address-family IPv4 --max-entries 1 \
-            --entries "Cidr=192.0.2.0/24,Description=stand-in for the AWS-managed list" \
+            --prefix-list-name "$STANDIN" --address-family IPv4 --max-entries 1 \
+            --entries "Cidr=192.0.2.0/24,Description=stand-in for the AWS-managed CloudFront list" \
             --query 'PrefixList.PrefixListId' --output text
           # The same question the Terraform data source asks.
           found=$(aws --endpoint-url "$AWS_ENDPOINT_URL" ec2 describe-managed-prefix-lists \
-            --filters "Name=prefix-list-name,Values=$PREFIX_LIST" \
+            --filters "Name=prefix-list-name,Values=$STANDIN" \
             --query 'length(PrefixLists)' --output text)
           if [ "$found" != 1 ]; then
-            echo "::error::after seeding, floci finds $found prefix lists named $PREFIX_LIST, not 1 — the NLB rule's lookup will fail"
+            echo "::error::after seeding, floci finds $found prefix lists named $STANDIN, not 1"
             exit 1
           fi
-          echo "seeded $PREFIX_LIST"
+          mapfile -t layers < <(grep -l 'variable "cloudfront_prefix_list_name"' infra/terraform/[0-9][0-9]-*/*.tf | xargs -r -n1 dirname | sort -u)
+          if [ "${#layers[@]}" -eq 0 ]; then
+            echo "::error::no layer declares cloudfront_prefix_list_name, so nothing would use the stand-in"
+            exit 1
+          fi
+          for dir in "${layers[@]}"; do
+            printf 'cloudfront_prefix_list_name = "%s"\n' "$STANDIN" > "$dir/emulator.auto.tfvars"
+            echo "$dir -> $STANDIN"
+          done
 
       # Host networking, so the agent reaches the emulator on the same
       # localhost:4566 that var.endpoint defaults to. The token is passed

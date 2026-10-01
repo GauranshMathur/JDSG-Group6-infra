@@ -30,11 +30,10 @@ locals {
   }
 }
 
-# CloudFront's origin-facing addresses, as AWS publishes and maintains them.
-# floci has no AWS-managed lists, so the workflow seeds a stand-in under this
-# name before applying; on real AWS this lookup finds the real one, unchanged.
+# CloudFront's origin-facing addresses, as AWS publishes and maintains them —
+# see the variable for how the emulator gets a stand-in.
 data "aws_ec2_managed_prefix_list" "cloudfront_origin" {
-  name = "com.amazonaws.global.cloudfront.origin-facing"
+  name = var.cloudfront_prefix_list_name
 }
 
 resource "aws_security_group" "this" {

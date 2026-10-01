@@ -172,9 +172,10 @@ its group by lookup.
 Trivy refuses any rule open to `0.0.0.0/0`, and the gate stays as it is. Open rules are
 designed out where the design allows: the NLB takes HTTPS only from CloudFront's origin-facing
 managed prefix list, which is what "nothing behind the perimeter sees the internet directly"
-means. floci has no AWS-managed lists, so the workflow seeds a stand-in under that name, with a
-documentation range as its one entry, before applying; the Terraform keeps the lookup that works
-on real AWS. Network ACLs stay at the VPC default rather than declaring a public ACL that must
+means. floci has no AWS-managed lists and refuses the reserved name for any other, so the
+lookup's name is a variable defaulting to AWS's own; the workflow seeds a stand-in with a
+documentation range as its one entry and points the layer at it through a generated
+`emulator.auto.tfvars`. Network ACLs stay at the VPC default rather than declaring a public ACL that must
 admit return traffic from anywhere. What can't be designed out gets an inline exception naming
 one check on one resource, with the reason above it. There is one: nodes out to the internet on
 443, for image pulls from GHCR (no stable range to narrow to) and for AWS APIs through NAT.
