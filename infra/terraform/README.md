@@ -20,7 +20,7 @@ will write its state to `twitter-clone-10`.
 | Layer | Workspace | Holds | Status |
 | --- | --- | --- | --- |
 | `00-foundation` | `twitter-clone-00` | KMS keys — and nothing else | applied |
-| `10-network` | `twitter-clone-10` | VPCs, subnets, gateways, routing, NACLs, security groups, transit gateway | everything but NACLs and security groups applied |
+| `10-network` | `twitter-clone-10` | VPCs, subnets, gateways, routing, transit gateway, and every layer's security groups | applied |
 | `20-edge` | `twitter-clone-20` | ACM, NLB, ALB, WAF, Route 53 | not started |
 | `30-platform` | `twitter-clone-30` | ECR, IAM, SSM | not started |
 | `40-data` | `twitter-clone-40` | Media bucket, and RDS when it lands | media bucket applied |
@@ -33,7 +33,9 @@ rather than under a name that only ever meant "built first". `10-network` holds 
 two public subnets in the perimeter routed out through its internet gateway with a NAT
 gateway in each, two private ones in the application VPC, and a transit gateway joining the
 two. The application VPC's only way out runs through it: transit gateway, the perimeter's NAT
-in the same zone, then the internet gateway. No security groups or NACLs yet. The other rows are the intended order, not a promise — see
+in the same zone, then the internet gateway. It also holds the security groups for the load
+balancers, nodes and database, which the layers creating those attach. Network ACLs are left
+at the VPC default on purpose — see the conventions below. The other rows are the intended order, not a promise — see
 [decisions.md](../../docs/decisions.md).
 
 > **A typo here does not fail — it creates.** If `cloud.tf` names a workspace that does not
@@ -76,6 +78,14 @@ nothing: the emulator routes no packet and enforces no rule. Those resources car
 `local.inert` (`Emulation = "inert"`), so a security group in state is never mistaken for one
 that filters traffic. A tag rather than a comment deliberately — it survives into state and
 shows up wherever the resource is read.
+
+**Security groups live in `10-network`, open to `0.0.0.0/0` only where they must be.** Every
+rule is reviewable in one file, and other layers attach groups rather than defining them. The
+NLB admits only CloudFront's origin-facing prefix list. The one rule open to the internet,
+nodes out on 443, carries a `#trivy:ignore` naming that single check, with the reason above
+it. Any new exception gets the same treatment: one check, one resource, the reason in the
+code. Network ACLs stay at the VPC default, since a declared public ACL would have to admit
+return traffic from anywhere.
 
 **No modules.** There is one of everything, so a module would add indirection without reuse,
 and it would hide the cross-references that the file split exists to make findable.

@@ -45,3 +45,8 @@ output "application_private_route_table_id" {
   description = "Route table for the application VPC's private subnets: everything to the transit gateway."
   value       = aws_route_table.application_private.id
 }
+
+output "security_group_ids" {
+  description = "Security group id by consumer — nlb, alb, nodes, rds. The layers that create those attach these."
+  value       = { for name, sg in aws_security_group.this : name => sg.id }
+}
