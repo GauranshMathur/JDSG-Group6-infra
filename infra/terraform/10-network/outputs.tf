@@ -30,3 +30,8 @@ output "perimeter_public_route_table_id" {
   description = "Route table shared by the perimeter's public subnets."
   value       = aws_route_table.perimeter_public.id
 }
+
+output "perimeter_nat_gateway_ids" {
+  description = "NAT gateway id by availability zone, in the perimeter's public subnets."
+  value       = { for az, nat in aws_nat_gateway.perimeter : az => nat.id }
+}
