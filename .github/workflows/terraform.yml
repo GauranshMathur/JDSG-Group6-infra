@@ -245,6 +245,39 @@ jobs:
           echo "::error::floci did not answer on :4566"
           exit 1
 
+      # floci serves no AWS-managed prefix lists, and 10-network's NLB rule looks
+      # up CloudFront's by name — the same lookup that works unchanged on real
+      # AWS. Create a list under that name here, standing in for what AWS itself
+      # provides, so the Terraform carries no emulator-only branch. Its one entry
+      # is a documentation range (RFC 5737), not CloudFront's: floci filters
+      # nothing, and a copy of AWS's ranges would only go stale.
+      #
+      # AWS_ENDPOINT_URL as well as --endpoint-url, so every call in this step
+      # goes to the emulator even if a flag is ever dropped. The credentials are
+      # fake, as everywhere here.
+      - name: Seed what the emulator lacks
+        env:
+          AWS_ENDPOINT_URL: http://127.0.0.1:4566
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+          PREFIX_LIST: com.amazonaws.global.cloudfront.origin-facing
+        run: |
+          set -euo pipefail
+          aws --endpoint-url "$AWS_ENDPOINT_URL" ec2 create-managed-prefix-list \
+            --prefix-list-name "$PREFIX_LIST" --address-family IPv4 --max-entries 1 \
+            --entries "Cidr=192.0.2.0/24,Description=stand-in for the AWS-managed list" \
+            --query 'PrefixList.PrefixListId' --output text
+          # The same question the Terraform data source asks.
+          found=$(aws --endpoint-url "$AWS_ENDPOINT_URL" ec2 describe-managed-prefix-lists \
+            --filters "Name=prefix-list-name,Values=$PREFIX_LIST" \
+            --query 'length(PrefixLists)' --output text)
+          if [ "$found" != 1 ]; then
+            echo "::error::after seeding, floci finds $found prefix lists named $PREFIX_LIST, not 1 — the NLB rule's lookup will fail"
+            exit 1
+          fi
+          echo "seeded $PREFIX_LIST"
+
       # Host networking, so the agent reaches the emulator on the same
       # localhost:4566 that var.endpoint defaults to. The token is passed
       # through the environment rather than on the command line.
