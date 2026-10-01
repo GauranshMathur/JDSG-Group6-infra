@@ -3,8 +3,7 @@
 # its outbound traffic crosses the transit gateway to these and leaves through
 # the perimeter. One per zone, so losing a zone does not take egress with it.
 #
-# Nothing routes to them yet. The route that sends the application VPC's
-# traffic here belongs to the transit gateway, which is its own change. Inert
+# The perimeter's transit subnets route to them — see route-tables.tf. Inert
 # like the rest of this layer: floci allocates the addresses and records the
 # gateways, and translates nothing.
 
