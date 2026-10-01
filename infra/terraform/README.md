@@ -21,7 +21,7 @@ will write its state to `twitter-clone-10`.
 | --- | --- | --- | --- |
 | `00-foundation` | `twitter-clone-00` | KMS keys — and nothing else | applied |
 | `10-network` | `twitter-clone-10` | VPCs, subnets, gateways, routing, transit gateway, and every layer's security groups | applied |
-| `20-edge` | `twitter-clone-20` | ACM, NLB, ALB, WAF, Route 53 | zone and certificate applied |
+| `20-edge` | `twitter-clone-20` | ACM, NLB, ALB, WAF, Route 53 | everything but WAF applied |
 | `30-platform` | `twitter-clone-30` | ECR, IAM, SSM | not started |
 | `40-data` | `twitter-clone-40` | Media bucket, and RDS when it lands | media bucket applied |
 | `50-cluster` | `twitter-clone-50` | EKS, node groups | not started |
@@ -36,7 +36,9 @@ two. The application VPC's only way out runs through it: transit gateway, the pe
 in the same zone, then the internet gateway. It also holds the security groups for the load
 balancers, nodes and database, which the layers creating those attach. Network ACLs are left
 at the VPC default on purpose — see the conventions below. `20-edge` holds the public zone for
-the app's domain, `twitter-clone.test` by default, and the certificate validated in it. The
+the app's domain, `twitter-clone.test` by default, the certificate validated in it, and the
+two load balancers in series: an internet-facing NLB admitting only CloudFront, and an internal
+ALB behind it that terminates TLS and forwards to the app's pods across the transit gateway. The
 other rows are the intended order, not a promise — see [decisions.md](../../docs/decisions.md).
 
 > **A typo here does not fail — it creates.** If `cloud.tf` names a workspace that does not

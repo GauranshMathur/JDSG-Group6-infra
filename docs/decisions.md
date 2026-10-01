@@ -182,6 +182,22 @@ one check on one resource, with the reason above it. There is one: nodes out to 
 Cost: every exception is a rule the scanner no longer reads, so each one has to be argued in
 review instead.
 
+## 2026-10-01 — Terraform owns the ALB; the cluster only binds pods to it
+
+The design had the AWS Load Balancer Controller create the ALB from a Kubernetes `Ingress`.
+Instead `20-edge` defines the NLB, the ALB, the ALB's HTTPS listener and the pods' target group,
+and the controller's part shrinks to a `TargetGroupBinding` that registers pod addresses into
+that target group. The NLB targets the ALB, which a controller-made ALB would make awkward: its
+ARN would exist only after the cluster did. And with the ALB in the perimeter VPC and the pods in
+the application VPC, the targets are addresses across the transit gateway, registered with
+availability zone `all`. That is supported, and simpler to see when the target group sits in
+Terraform beside the rest of the edge.
+
+Cost. Routing rules no longer come from the `Ingress`, so a new host or path is a Terraform change
+rather than a manifest change. The `TargetGroupBinding` is AWS-only, so it belongs with the
+reference design's EKS configuration and never in the cluster-agnostic manifests the local
+cluster runs, where Traefik does the ingress.
+
 ---
 
 ## Undecided
