@@ -19,3 +19,8 @@ output "app_target_group_arn" {
   description = "Where the cluster's TargetGroupBinding registers the app's pods."
   value       = aws_lb_target_group.app.arn
 }
+
+output "web_acl_arn" {
+  description = "The WAF web ACL on the ALB."
+  value       = aws_wafv2_web_acl.alb.arn
+}
