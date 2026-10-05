@@ -18,6 +18,7 @@ provider "aws" {
     elbv2   = var.endpoint
     route53 = var.endpoint
     sts     = var.endpoint
+    wafv2   = var.endpoint
   }
 
   default_tags {
