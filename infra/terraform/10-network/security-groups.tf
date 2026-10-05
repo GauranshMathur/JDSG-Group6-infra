@@ -141,8 +141,8 @@ resource "aws_vpc_security_group_egress_rule" "nodes_dns" {
   cidr_ipv4         = local.vpc_cidrs.application
 }
 
-# The one rule open to the internet, and the one exception to the security
-# scan. Nodes pull the app image from GHCR (decided 2026-08-05) and reach AWS
+# The one rule open to the internet, and one of the security scan's two
+# exceptions — the other is the internet-facing NLB in 20-edge. Nodes pull the app image from GHCR (decided 2026-08-05) and reach AWS
 # APIs — S3 for media, SSM, STS for IRSA — all on 443, out through the
 # perimeter's NAT. GHCR publishes no stable address range to narrow this to.
 # HTTPS only; nothing else leaves.
