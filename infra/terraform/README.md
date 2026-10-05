@@ -124,7 +124,9 @@ The `Terraform policy` check holds this on every pull request:
 
 A push to `main` applies, and so does a run by hand from `main` or a `twitter-clone-NN`
 branch — from nowhere else. Applies run one at a time across the repository, since every run
-applies every layer into its shared workspace. Shared files — the workflow, this README — go
+applies every layer into its shared workspace. And an apply refuses a commit that is behind `main` — checked once it holds the
+lock, since `main` can move while it waits — because it would put other layers' older
+configuration back into their workspaces. Shared files — the workflow, this README — go
 on a `ci/` or `docs/` branch, and their first apply is the push to `main` after merge.
 
 0. Branch from `main` as `twitter-clone-NN`, for the new layer's prefix.

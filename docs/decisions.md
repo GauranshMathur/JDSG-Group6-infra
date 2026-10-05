@@ -202,6 +202,25 @@ rather than a manifest change. The `TargetGroupBinding` is AWS-only, so it belon
 reference design's EKS configuration and never in the cluster-agnostic manifests the local
 cluster runs, where Traefik does the ingress.
 
+## 2026-10-05 — An apply refuses a commit that is behind main
+
+Every run applies every layer, so a branch for one workspace still writes every other layer's
+configuration into theirs. That is harmless while the branch is current, and wrong the moment
+`main` moves past it. It happened: a re-run of #51 reused a merge commit made before #52 added a
+WAF to `20-edge`; that older `20-edge` had no `wafv2` endpoint, the refresh of the WAF #52 had
+just written went to real AWS, and the plan failed on the fake credentials. Nothing was applied,
+and nothing could have been created, but it was a call to Amazon all the same.
+
+So the apply job's first step, run once it holds the lock, asks GitHub how many commits on `main`
+the commit being applied lacks, and stops if any. A pull request that is behind is told to bring
+`main` in. A push that `main` has moved past is superseded by the run for the newer commit. The
+one-branch-per-workspace rule could not catch this, because the stale branch was for a different
+workspace than the state it disturbed.
+
+Cost. A pull request that falls behind while it waits for the lock fails and needs `main` merged
+in. A superseded push to `main` shows red on its commit, though the newer commit's run applies.
+And it rests on GitHub's compare API answering: if it does not, the check fails closed.
+
 ---
 
 ## Undecided
