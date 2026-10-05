@@ -163,6 +163,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Every run applies every layer into its shared workspace, from the commit
+      # it was created with. If main has moved since — a merge landed while this
+      # run waited for the lock, or this is a re-run of an old run — that commit
+      # carries other layers' older configuration, and applying it fights the
+      # newer state. It has already gone wrong once: a resource the newer
+      # configuration added was refreshed by an older one with no endpoint for
+      # its service, and the call went to real AWS. So check here, while the lock
+      # is held, not when the run was queued. behind_by is the number of commits
+      # on main that the commit being applied lacks; on a pull request that
+      # commit is the merge commit, so a branch that is up to date passes.
+      - name: Check this run is not behind main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          behind=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$GITHUB_SHA" --jq .behind_by)
+          case "$behind" in
+            ''|*[!0-9]*) echo "::error::could not tell how far $GITHUB_SHA is behind main (got '$behind')"; exit 1 ;;
+          esac
+          if [ "$behind" -eq 0 ]; then
+            echo "$GITHUB_SHA has everything on main: applying."
+            exit 0
+          fi
+          case "$EVENT" in
+            pull_request)
+              echo "::error::main has moved $behind commit(s) since this run's merge commit was made. Applying it would put other layers' older configuration back into their workspaces. Bring main into the branch — a merge, not an empty commit — and the new run will apply." ;;
+            push)
+              echo "::error::main has moved $behind commit(s) past this one, so this run is superseded: the run for the newer commit applies it. Nothing was applied here." ;;
+            *)
+              echo "::error::$GITHUB_REF_NAME is $behind commit(s) behind main. Bring main into it before running by hand." ;;
+          esac
+          exit 1
+
       # Fail in two seconds with the reason, rather than thirty seconds later
       # inside a container that says only "token is required".
       - name: Check the HCP Terraform secrets are set
