@@ -86,8 +86,9 @@ shows up wherever the resource is read.
 rule is reviewable in one file, and other layers attach groups rather than defining them. The
 NLB admits only CloudFront's origin-facing prefix list. The one rule open to the internet,
 nodes out on 443, carries a `#trivy:ignore` naming that single check, with the reason above
-it. Any new exception gets the same treatment: one check, one resource, the reason in the
-code. Network ACLs stay at the VPC default, since a declared public ACL would have to admit
+it. The repository has two such exceptions — that rule, and the NLB in `20-edge` being
+internet-facing — and any new one gets the same treatment: one check, one resource, the reason
+in the code, and asked for rather than assumed. Network ACLs stay at the VPC default, since a declared public ACL would have to admit
 return traffic from anywhere.
 
 **No modules.** There is one of everything, so a module would add indirection without reuse,

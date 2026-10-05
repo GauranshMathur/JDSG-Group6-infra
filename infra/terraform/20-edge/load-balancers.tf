@@ -13,6 +13,12 @@
 # about a minute to create there — the provider waits out a state change the
 # emulator never makes (docs/floci.md).
 
+# The design's front door, and the security scan's second exception. Traffic
+# crosses the internet gateway to this NLB, so it must be internet-facing;
+# Trivy flags any load balancer that is. What reaches it is narrowed instead,
+# by its security group in 10-network: HTTPS from CloudFront's origin-facing
+# addresses and nothing else. Decided 2026-10-05, docs/decisions.md.
+#trivy:ignore:aws-elb-alb-not-public
 resource "aws_lb" "nlb" {
   name               = "${local.name_prefix}-nlb"
   load_balancer_type = "network"

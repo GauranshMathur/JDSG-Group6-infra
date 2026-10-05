@@ -177,8 +177,12 @@ lookup's name is a variable defaulting to AWS's own; the workflow seeds a stand-
 documentation range as its one entry and points the layer at it through a generated
 `emulator.auto.tfvars`. Network ACLs stay at the VPC default rather than declaring a public ACL that must
 admit return traffic from anywhere. What can't be designed out gets an inline exception naming
-one check on one resource, with the reason above it. There is one: nodes out to the internet on
-443, for image pulls from GHCR (no stable range to narrow to) and for AWS APIs through NAT.
+one check on one resource, with the reason above it. There are two. Nodes out to the internet on
+443, for image pulls from GHCR (no stable range to narrow to) and for AWS APIs through NAT. And,
+added 2026-10-05, the NLB in `20-edge` being internet-facing: it is the design's front door,
+reached across the internet gateway, and what reaches it is narrowed by its security group to
+CloudFront alone. Making it internal behind a CloudFront VPC origin would have removed the
+exception, but rewrites the ingress path, and CloudFront cannot be applied here to build it.
 Cost: every exception is a rule the scanner no longer reads, so each one has to be argued in
 review instead.
 
